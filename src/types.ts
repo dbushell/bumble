@@ -24,6 +24,6 @@ export interface BumbleComponent {
   };
 }
 
-export interface BumbleModule {
+export type BumbleModule<M> = M & {
   default: BumbleComponent | CallableFunction;
-}
+};

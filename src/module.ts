@@ -1,9 +1,9 @@
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */
-export const importDynamicBundle = async (
+export const importDynamicBundle = async <M>(
   bundle: BumbleBundle
-): Promise<BumbleModule> => {
+): Promise<BumbleModule<M>> => {
   let {code, external} = bundle;
   // Append import statements
   for (const [from, imports] of external.entries()) {
@@ -18,9 +18,9 @@ export const importDynamicBundle = async (
 };
 
 /** Evaluate bundle in a function that returns the exports */
-export const importFunctionBundle = async (
+export const importFunctionBundle = async <M>(
   bundle: BumbleBundle
-): Promise<BumbleModule> => {
+): Promise<BumbleModule<M>> => {
   let {code, external} = bundle;
   //@ts-ignore: lol
   globalThis['📦'] = {};
@@ -57,12 +57,12 @@ export const importFunctionBundle = async (
 };
 
 /** Import module bundle */
-export const importBundle = (
+export const importBundle = <M>(
   options: BumbleOptions,
   bundle: BumbleBundle
-): Promise<BumbleModule> => {
+): Promise<BumbleModule<M>> => {
   if (options.dynamicImports) {
-    return importDynamicBundle(bundle);
+    return importDynamicBundle<M>(bundle);
   }
-  return importFunctionBundle(bundle);
+  return importFunctionBundle<M>(bundle);
 };
