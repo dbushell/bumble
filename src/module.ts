@@ -28,6 +28,7 @@ export const importFunctionBundle = async <M>(
   // Needed for Deno Deploy limitations
   const map = {
     svelte: async () => await import('npm:svelte'),
+    'svelte/store': async () => await import('npm:svelte/store'),
     'svelte/internal': async () => await import('npm:svelte/internal')
   };
   // Reference imports from global namespace

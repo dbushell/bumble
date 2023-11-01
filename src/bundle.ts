@@ -97,6 +97,7 @@ const compile = async (
 
   // Iterate over code lines to handle imports
   for (const line of code.split('\n')) {
+    if (!line.trim()) continue;
     // Ignore non import statements
     if (line.trim().startsWith('import') === false) {
       newLines.push(line);
@@ -141,7 +142,7 @@ const compile = async (
         /^\s*export\s+default\s+(.+?)\s*;\s*$/m,
         `globalThis['🥡'].set('${newPath}', $1);`
       );
-      newLines.push(`/* ${newPath} */\n{${newCode}}`);
+      newLines.push(`/* ${newPath} */`, '{', newCode, '}');
       newLines.push(`const ${name} = globalThis['🥡'].get('${newPath}');`);
       continue;
     }
