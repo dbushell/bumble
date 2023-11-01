@@ -21,7 +21,7 @@ export const sveltePreprocess = async (
         }
         const result = typescript.transpileModule(match[2], {
           compilerOptions: {
-            ...options?.compilerOptions,
+            ...options?.typescript,
             ...compilerOptions
           }
         });

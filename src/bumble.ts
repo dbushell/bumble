@@ -8,15 +8,15 @@ export default class Bumble<M> {
   #kvPath: string | undefined;
   #deployId: string | undefined;
   #dynamicImports: boolean;
-  #compilerOptions: BumbleOptions['compilerOptions'];
+  #typescript: BumbleOptions['typescript'];
   #cacheReady = false;
 
   constructor(options?: BumbleOptions) {
     this.#kvPath = options?.kvPath ?? undefined;
     this.#deployId = options?.deployId ?? undefined;
     this.#dynamicImports = options?.dynamicImports ?? false;
-    this.#compilerOptions = {
-      ...(options?.compilerOptions ?? {}),
+    this.#typescript = {
+      ...(options?.typescript ?? {}),
       ...compilerOptions
     };
   }
@@ -30,7 +30,7 @@ export default class Bumble<M> {
   async bumble(abspath: string): Promise<BumbleModule<M>> {
     const options: BumbleOptions = {
       dynamicImports: this.#dynamicImports,
-      compilerOptions: this.#compilerOptions
+      typescript: this.#typescript
     };
     if (this.#deployId) {
       options.kvPath = this.#kvPath;

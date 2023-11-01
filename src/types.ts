@@ -8,7 +8,7 @@ export interface BumbleOptions {
   /** Dynamic imports are faster and safer */
   dynamicImports?: boolean;
   /** TypeScript compiler options (e.g. `paths`) */
-  compilerOptions?: CompilerOptions;
+  typescript?: CompilerOptions;
 }
 
 export interface BumbleBundle {

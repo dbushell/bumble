@@ -72,7 +72,7 @@ const compile = async (
     if (entry.endsWith('.ts')) {
       const result = typescript.transpileModule(code, {
         compilerOptions: {
-          ...bumbler.options?.compilerOptions,
+          ...bumbler.options?.typescript,
           ...compilerOptions
         }
       });
@@ -116,7 +116,7 @@ const compile = async (
     }
 
     // Resolve paths using tsconfig.json
-    const paths = bumbler.options?.compilerOptions?.paths;
+    const paths = bumbler.options?.typescript?.paths;
     if (paths) {
       for (let [key, [value]] of Object.entries(paths)) {
         key = key.replace(/\*$/, '');
