@@ -30,7 +30,7 @@ export default class Bumble<M> {
       options.kvPath = this.#kvPath;
       options.deployId = await encodeHash(this.#deployId, 'SHA-1');
       if (!this.#cacheReady) {
-        await this.#setupCache();
+        await this.#setupCache(options.deployId);
       }
     }
     const {code, external} = await bundle(abspath, options);
@@ -38,12 +38,12 @@ export default class Bumble<M> {
     return mod;
   }
 
-  #setupCache = async () => {
-    if (!this.#deployId) return;
+  #setupCache = async (cacheId?: string) => {
+    if (!cacheId) return;
     const db = await Deno.openKv(this.#kvPath);
     const entries = db.list({prefix: ['cache']});
     for await (const entry of entries) {
-      if (!entry.key.includes(this.#deployId)) {
+      if (!entry.key.includes(cacheId)) {
         await db.delete(entry.key);
       }
     }
