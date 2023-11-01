@@ -33,11 +33,24 @@ const compile = async (
 ): Promise<string> => {
   let code = await Deno.readTextFile(entry);
 
+  const importPath = getPath(entry);
+
+  // Check compiled cache
+  const {kvPath: cachePath, deployId: cacheId} = bumbler.options ?? {};
+  if (cacheId) {
+    const db = await Deno.openKv(cachePath);
+    const cached = await db.get<string>(['cache', cacheId, importPath]);
+    db.close();
+    if (cached.value) {
+      return cached.value;
+    }
+  }
+
   // Check if already compiled
-  if (bumbler.imports.has(getPath(entry))) {
+  if (bumbler.imports.has(importPath)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  bumbler.imports.add(getPath(entry));
+  bumbler.imports.add(importPath);
 
   // Handle Svelte components
   if (entry.endsWith('.svelte')) {
@@ -81,7 +94,7 @@ const compile = async (
     newLines.push(`globalThis['🥡'] = new Map();`);
   }
 
-  // Iterate over code lines
+  // Iterate over code lines to handle imports
   for (const line of code.split('\n')) {
     // Ignore non import statements
     if (line.trim().startsWith('import') === false) {
@@ -92,6 +105,12 @@ const compile = async (
       line.match(/import\s+(.*?)\s+from\s+["|']([^"|']+)["|']/) ?? [];
     if (!name) {
       throw new Error(`Invalid import (${entry})`);
+    }
+
+    // Svelte imports will be merged later
+    if (mod.startsWith('svelte')) {
+      newLines.push(line);
+      continue;
     }
 
     // Resolve paths using tsconfig.json
@@ -106,35 +125,38 @@ const compile = async (
       }
     }
 
-    if (mod.startsWith('svelte')) {
-      bumbler.svelteImports.push(line);
-      continue;
-    }
-
     // Handle relative imports
     if (/^(\.|\/)/.test(mod) && /\.(svelte|ts|js)$/.test(entry)) {
       const newEntry = path.resolve(path.dirname(entry), mod);
-      const absName = getPath(newEntry);
+      const newPath = getPath(newEntry);
       // Check if import was already compiled
-      if (bumbler.imports.has(absName)) {
-        newLines.push(`const ${name} = globalThis['🥡'].get('${absName}');`);
+      if (bumbler.imports.has(newPath)) {
+        newLines.push(`const ${name} = globalThis['🥡'].get('${newPath}');`);
         continue;
       }
       // Otherwise, compile and bundle
       let newCode = await compile(newEntry, bumbler, depth + 1);
       newCode = newCode.replace(
         /^\s*export\s+default\s+(.+?)\s*;\s*$/m,
-        `globalThis['🥡'].set('${absName}', $1);`
+        `globalThis['🥡'].set('${newPath}', $1);`
       );
-      newLines.push(`/* ${absName} */\n{${newCode}}`);
-      newLines.push(`const ${name} = globalThis['🥡'].get('${absName}');`);
+      newLines.push(`/* ${newPath} */\n{${newCode}}`);
+      newLines.push(`const ${name} = globalThis['🥡'].get('${newPath}');`);
       continue;
     }
 
     // TODO: Handle unknown imports?
     bumbler.unknownImports.push(line);
   }
-  return newLines.join('\n');
+
+  // Return compiled code and cache if enabled
+  code = newLines.join('\n');
+  if (cacheId) {
+    const db = await Deno.openKv(cachePath);
+    await db.set(['cache', cacheId, importPath], code);
+    db.close();
+  }
+  return code;
 };
 
 export const bundle = async (
@@ -148,8 +170,23 @@ export const bundle = async (
     unknownImports: [],
     options
   };
+
   // Compile from main entry
-  const code = await compile(entry, bumbler);
+  let code = await compile(entry, bumbler);
+
+  // Extract Svelte imports
+  const newLines = [];
+  for (const line of code.split('\n')) {
+    const match =
+      line.match(/import\s+(.*?)\s+from\s+["|']([^"|']+)["|']/) ?? [];
+    if (match?.[2]?.startsWith('svelte')) {
+      bumbler.svelteImports.push(line);
+    } else {
+      newLines.push(line);
+    }
+  }
+  code = newLines.join('\n');
+
   // Merge external Svelte imports
   const external = new Map<string, string[]>();
   for (const line of bumbler.svelteImports) {

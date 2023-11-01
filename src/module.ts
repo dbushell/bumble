@@ -10,7 +10,8 @@ export const importDynamicBundle = async <M>(
     const statement = `import { ${imports.join(', ')} } from "npm:${from}";`;
     code = `${statement}\n${code}`;
   }
-  const blob = new Blob([code], {type: 'application/javascript'});
+  // const url = `data:text/javascript;base64,${base64.encodeBase64(code)}`;
+  const blob = new Blob([code], {type: 'text/javascript'});
   const url = URL.createObjectURL(blob);
   const mod = await import(url);
   URL.revokeObjectURL(url);

@@ -1,6 +1,10 @@
 import type {CompilerOptions} from './deps.ts';
 
 export interface BumbleOptions {
+  /** Used to cache compiled routes */
+  kvPath?: string;
+  /** Used to cache compiled routes (will be hashed) */
+  deployId?: string;
   /** Dynamic imports are faster and safer */
   dynamicImports?: boolean;
   /** TypeScript compiler options (e.g. `paths`) */
