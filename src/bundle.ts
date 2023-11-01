@@ -89,6 +89,12 @@ const compile = async (
     newLines.push(`globalThis['🥡'] = new Map();`);
   }
 
+  // Remove newlines and extra spaces from imports
+  const imports = /import\s*{[^}]*}\s*from\s*(['"])[^'"]*\1\s*;/g;
+  code = code.replace(imports, (m) =>
+    m.replace(/\n/g, '').replace(/\s+/g, ' ')
+  );
+
   // Iterate over code lines to handle imports
   for (const line of code.split('\n')) {
     // Ignore non import statements
