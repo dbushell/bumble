@@ -84,11 +84,6 @@ const compile = async (
     throw new Error(`Unknown extension (${entry})`);
   }
 
-  // Check for default export (must be single variable export)
-  if (!/^\s*export\s+default\s+(\w+)\s*;/gm.test(code)) {
-    throw new Error(`No default export (${entry})`);
-  }
-
   const newLines = [];
   if (depth === 0) {
     newLines.push(`globalThis['🥡'] = new Map();`);
