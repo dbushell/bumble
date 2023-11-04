@@ -1,6 +1,6 @@
-import {path, svelte, typescript} from './deps.ts';
-import {sveltePreprocess} from './preprocess.ts';
-import compilerOptions from './tsconfig.ts';
+import {path} from './deps.ts';
+import {compileSvelte} from './svelte.ts';
+import {transpileTs} from './typescript.ts';
 import type {BumbleBundle, BumbleOptions} from './types.ts';
 
 interface Bumbler {
@@ -54,33 +54,18 @@ const compile = async (
 
   // Handle Svelte components
   if (entry.endsWith('.svelte')) {
-    if (code.includes('lang="ts"')) {
-      code = await sveltePreprocess(code, bumbler.options);
-    }
-    const result = svelte.compile(code, {
-      generate: 'ssr',
-      name: getName(entry),
-      immutable: true,
-      discloseVersion: false,
-      enableSourcemap: false,
-      css: 'none'
-    });
-    code = result.js.code;
+    code = await compileSvelte(getName(entry), code, bumbler.options);
+  }
 
-    // Handle JS and TypeScript
-  } else if (/\.(ts|js)$/.test(entry)) {
+  // Handle JS and TypeScript
+  else if (/\.(ts|js)$/.test(entry)) {
     if (entry.endsWith('.ts')) {
-      const result = typescript.transpileModule(code, {
-        compilerOptions: {
-          ...bumbler.options?.typescript,
-          ...compilerOptions
-        }
-      });
-      code = result.outputText;
+      code = transpileTs(code, bumbler.options?.typescript);
     }
+  }
 
-    // TODO: Handle JSON?
-  } else {
+  // TODO: Handle JSON?
+  else {
     throw new Error(`Unknown extension (${entry})`);
   }
 

@@ -1,6 +1,6 @@
 import {bundle} from './bundle.ts';
 import {importBundle} from './module.ts';
-import compilerOptions from './tsconfig.ts';
+import {compilerOptions} from './typescript.ts';
 import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleModule} from './types.ts';
 

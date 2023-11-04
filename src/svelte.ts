@@ -1,9 +1,8 @@
-import {svelte, typescript} from './deps.ts';
-import compilerOptions from './tsconfig.ts';
+import {svelte} from './deps.ts';
+import {transpileTs} from './typescript.ts';
 import type {BumbleOptions} from './types.ts';
 
-/** Svelte preprocess */
-export const sveltePreprocess = async (
+export const processSvelte = async (
   code: string,
   options?: BumbleOptions
 ): Promise<string> => {
@@ -19,15 +18,10 @@ export const sveltePreprocess = async (
           scripts += match[0];
           continue;
         }
-        const result = typescript.transpileModule(match[2], {
-          compilerOptions: {
-            ...options?.typescript,
-            ...compilerOptions
-          }
-        });
         // Replace with transpiled code
         attr = attr.replace('lang="ts"', '');
-        scripts += `<script${attr}>\n${result.outputText}\n</script>`;
+        const code = transpileTs(match[2], options?.typescript);
+        scripts += `<script${attr}>\n${code}\n</script>`;
       }
       // Strip existing scripts
       let code = markup.content.replaceAll(
@@ -40,4 +34,23 @@ export const sveltePreprocess = async (
     }
   });
   return process.code;
+};
+
+export const compileSvelte = async (
+  name: string,
+  code: string,
+  options?: BumbleOptions
+) => {
+  if (code.includes('lang="ts"')) {
+    code = await processSvelte(code, options);
+  }
+  const result = svelte.compile(code, {
+    name,
+    generate: 'ssr',
+    immutable: true,
+    discloseVersion: false,
+    enableSourcemap: false,
+    css: 'none'
+  });
+  return result.js.code;
 };
