@@ -1,4 +1,5 @@
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
+import {splitLines, parseExport} from './parse.ts';
 
 /** Import bundle from a blob URL */
 export const importDynamicBundle = async <M>(
@@ -39,19 +40,19 @@ export const importFunctionBundle = async <M>(
       });
     }
   }
-  // Replace default export with return statement
-  const component = code.match(/export\s+default\s+(\w+);/)?.[1];
-  let statement = `return { default: ${component}`;
-  // Add named exports to return statement
-  let match;
-  const regexp = /^export\s+{(.*?)};$/gm;
-  while ((match = regexp.exec(code)) !== null) {
-    match[1].split(',').map((i) => {
-      statement += `, ${i.trim()}`;
-    });
+  const [exported, codeLines] = splitLines(code, /^\s*export\s+/);
+  code = codeLines.join('\n');
+  // Return values
+  const values: string[] = [];
+  for (const line of exported) {
+    const name = parseExport(line);
+    if (typeof name === 'string') {
+      values.push(`default: ${name}`);
+    } else if (name.length) {
+      values.push(...name);
+    }
   }
-  statement += ' };';
-  code = code.replaceAll(/^export\s+(.*?);$/gm, '');
+  const statement = `return { ${values.join(', ')} };`;
   code = `'use strict';\n${code}\n${statement}`;
   return Function(code)();
 };

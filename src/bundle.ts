@@ -1,12 +1,11 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './svelte.ts';
-import {transpileTs} from './typescript.ts';
+import {transpileTs, resolveModule} from './typescript.ts';
+import {shrinkCode, splitLines, parseImport, parseExport} from './parse.ts';
 import type {BumbleBundle, BumbleOptions} from './types.ts';
 
 interface Bumbler {
   imports: Set<string>;
-  svelteImports: string[];
-  unknownImports: string[];
   options?: BumbleOptions;
 }
 
@@ -56,88 +55,66 @@ const compile = async (
   if (entry.endsWith('.svelte')) {
     code = await compileSvelte(getName(entry), code, bumbler.options);
   }
-
   // Handle JS and TypeScript
   else if (/\.(ts|js)$/.test(entry)) {
     if (entry.endsWith('.ts')) {
       code = transpileTs(code, bumbler.options?.typescript);
     }
   }
-
   // TODO: Handle JSON?
   else {
     throw new Error(`Unknown extension (${entry})`);
   }
 
-  const newLines = [];
-  if (depth === 0) {
-    newLines.push(`globalThis['🥡'] = new Map();`);
-  }
+  // Cleanup code to make line parsing easier
+  code = shrinkCode(code);
 
-  // Remove newlines and extra spaces from imports
-  const imports = /import\s*{[^}]*}\s*from\s*(['"])[^'"]*\1\s*;/g;
-  code = code.replace(imports, (m) =>
-    m.replace(/\n/g, '').replace(/\s+/g, ' ')
-  );
+  const codeLines = [];
+  if (depth === 0) {
+    codeLines.push(`globalThis['🥡'] = new Map();`);
+  }
 
   // Iterate over code lines to handle imports
   for (const line of code.split('\n')) {
     if (!line.trim()) continue;
     // Ignore non import statements
-    if (line.trim().startsWith('import') === false) {
-      newLines.push(line);
+    let [names, from] = parseImport(line);
+    if (names.length !== 1) {
+      codeLines.push(line);
       continue;
     }
-    let [, name, mod] =
-      line.match(/import\s+(.*?)\s+from\s+["|']([^"|']+)["|']/) ?? [];
-    if (!name) {
-      throw new Error(`Invalid import (${entry})`);
+    if (bumbler.options?.typescript?.paths) {
+      from = resolveModule(from, bumbler.options.typescript.paths);
     }
-
-    // Svelte imports will be merged later
-    if (mod.startsWith('svelte')) {
-      newLines.push(line);
+    // Skip non-relative or unknown imports
+    if ((/^(\.|\/)/.test(from) && /\.(svelte|ts|js)$/.test(entry)) === false) {
+      codeLines.push(line);
       continue;
     }
-
-    // Resolve paths using tsconfig.json
-    const paths = bumbler.options?.typescript?.paths;
-    if (paths) {
-      for (let [key, [value]] of Object.entries(paths)) {
-        key = key.replace(/\*$/, '');
-        value = value.replace(/\*$/, '');
-        if (mod.startsWith(key)) {
-          mod = mod.replace(new RegExp(`^${key}`), value);
-        }
+    const newEntry = path.resolve(path.dirname(entry), from);
+    const newPath = getPath(newEntry);
+    // Check if import was already compiled
+    if (bumbler.imports.has(newPath)) {
+      codeLines.push(`const ${names[0]} = globalThis['🥡'].get('${newPath}');`);
+      continue;
+    }
+    // Otherwise, compile and bundle
+    const newCode = await compile(newEntry, bumbler, depth + 1);
+    const [exported, subLines] = splitLines(newCode, /^\s*export\s+/);
+    for (const line of exported) {
+      const name = parseExport(line);
+      if (typeof name === 'string') {
+        subLines.push(`globalThis['🥡'].set('${newPath}', ${name});`);
+      } else {
+        subLines.push(line);
       }
     }
-
-    // Handle relative imports
-    if (/^(\.|\/)/.test(mod) && /\.(svelte|ts|js)$/.test(entry)) {
-      const newEntry = path.resolve(path.dirname(entry), mod);
-      const newPath = getPath(newEntry);
-      // Check if import was already compiled
-      if (bumbler.imports.has(newPath)) {
-        newLines.push(`const ${name} = globalThis['🥡'].get('${newPath}');`);
-        continue;
-      }
-      // Otherwise, compile and bundle
-      let newCode = await compile(newEntry, bumbler, depth + 1);
-      newCode = newCode.replace(
-        /^\s*export\s+default\s+(.+?)\s*;\s*$/m,
-        `globalThis['🥡'].set('${newPath}', $1);`
-      );
-      newLines.push(`/* ${newPath} */`, '{', newCode, '}');
-      newLines.push(`const ${name} = globalThis['🥡'].get('${newPath}');`);
-      continue;
-    }
-
-    // TODO: Handle unknown imports?
-    bumbler.unknownImports.push(line);
+    // TODO: check for default export?
+    codeLines.push(`/* ${newPath} */`, '{', subLines.join('\n'), '}');
+    codeLines.push(`const ${names[0]} = globalThis['🥡'].get('${newPath}');`);
   }
-
   // Return compiled code and cache if enabled
-  code = newLines.join('\n');
+  code = codeLines.join('\n');
   if (cacheId) {
     const db = await Deno.openKv(cachePath);
     await db.set(['cache', cacheId, importPath], code);
@@ -153,37 +130,20 @@ export const bundle = async (
   // Start new bundle
   const bumbler: Bumbler = {
     imports: new Set(),
-    svelteImports: [],
-    unknownImports: [],
     options
   };
-
   // Compile from main entry
   let code = await compile(entry, bumbler);
-
-  // Extract Svelte imports
-  const newLines = [];
-  for (const line of code.split('\n')) {
-    const match =
-      line.match(/import\s+(.*?)\s+from\s+["|']([^"|']+)["|']/) ?? [];
-    if (match?.[2]?.startsWith('svelte')) {
-      bumbler.svelteImports.push(line);
-    } else {
-      newLines.push(line);
-    }
-  }
-  code = newLines.join('\n');
-
+  const [imported, codeLines] = splitLines(code, /^\s*import\s+/);
+  code = codeLines.join('\n');
   // Merge external Svelte imports
   const external = new Map<string, string[]>();
-  for (const line of bumbler.svelteImports) {
-    const from = line.match(/from\s+["|']([^"|']+)["|']/);
-    if (!from) continue;
-    const imports = line.match(/import\s+\{(.+?)\}/);
-    if (!imports) continue;
-    let arr = external.get(from?.[1]) || [];
-    arr = [...arr, ...imports?.[1].split(', ').map((i) => i.trim())];
-    external.set(from?.[1], [...new Set(arr)]);
+  for (const line of imported) {
+    const [names, from] = parseImport(line);
+    if (!from.startsWith('svelte')) {
+      throw new Error(`Unknown import (${entry}) (${line})`);
+    }
+    external.set(from, [...new Set([...(external.get(from) || []), ...names])]);
   }
   return {code, external};
 };

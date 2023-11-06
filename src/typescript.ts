@@ -21,3 +21,17 @@ export const transpileTs = (
   });
   return result.outputText;
 };
+
+export const resolveModule = (
+  name: string,
+  paths: Exclude<typescript.CompilerOptions['paths'], undefined>
+) => {
+  for (let [key, [value]] of Object.entries(paths)) {
+    key = key.replace(/\*$/, '');
+    value = value.replace(/\*$/, '');
+    if (name.startsWith(key)) {
+      name = name.replace(new RegExp(`^${key}`), value);
+    }
+  }
+  return name;
+};
