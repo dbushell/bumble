@@ -31,3 +31,9 @@ export interface BumbleComponent {
 export type BumbleModule<M> = M & {
   default: BumbleComponent | CallableFunction;
 };
+
+declare global {
+  interface Window {
+    '📦': Record<string, unknown>;
+  }
+}

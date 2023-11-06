@@ -23,10 +23,9 @@ export const importFunctionBundle = async <M>(
   bundle: BumbleBundle
 ): Promise<BumbleModule<M>> => {
   let {code, external} = bundle;
-  //@ts-ignore: lol
-  globalThis['📦'] = {};
+  window['📦'] = {};
   // Needed for Deno Deploy limitations
-  const map = {
+  const map: Record<string, () => unknown> = {
     svelte: async () => await import('npm:svelte'),
     'svelte/store': async () => await import('npm:svelte/store'),
     'svelte/internal': async () => await import('npm:svelte/internal')
@@ -34,10 +33,9 @@ export const importFunctionBundle = async <M>(
   // Reference imports from global namespace
   for (const [from, imports] of external.entries()) {
     if (Object.hasOwn(map, from)) {
-      //@ts-ignore: lol
-      globalThis['📦'][from] = await map[from]();
+      window['📦'][from] = await map[from]();
       imports.forEach((name) => {
-        code = `const {${name}} = globalThis['📦']['${from}'];\n${code}`;
+        code = `const {${name}} = window['📦']['${from}'];\n${code}`;
       });
     }
   }
