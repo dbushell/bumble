@@ -34,6 +34,7 @@ const compile = async (
 
   const importPath = getPath(entry);
 
+  /*
   // Check compiled cache
   const {kvPath: cachePath, deployId: cacheId} = bumbler.options ?? {};
   if (cacheId) {
@@ -44,6 +45,7 @@ const compile = async (
       return cached.value;
     }
   }
+  */
 
   // Check if already compiled
   if (bumbler.imports.has(importPath)) {
@@ -115,11 +117,14 @@ const compile = async (
   }
   // Return compiled code and cache if enabled
   code = codeLines.join('\n');
+
+  /*
   if (cacheId) {
     const db = await Deno.openKv(cachePath);
     await db.set(['cache', cacheId, importPath], code);
     db.close();
   }
+  */
   return code;
 };
 

@@ -5,14 +5,14 @@ import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleModule} from './types.ts';
 
 export default class Bumble<M> {
-  #kvPath: string | undefined;
+  // #kvPath: string | undefined;
   #deployId: string | undefined;
   #dynamicImports: boolean;
   #typescript: BumbleOptions['typescript'];
   #cacheReady = false;
 
   constructor(options?: BumbleOptions) {
-    this.#kvPath = options?.kvPath ?? undefined;
+    // this.#kvPath = options?.kvPath ?? undefined;
     this.#deployId = options?.deployId ?? undefined;
     this.#dynamicImports = options?.dynamicImports ?? false;
     this.#typescript = {
@@ -27,24 +27,47 @@ export default class Bumble<M> {
     );
   }
 
-  async bumble(abspath: string): Promise<BumbleModule<M>> {
+  async bumbleDOM(abspath: string): Promise<string> {
+    const options: BumbleOptions = {
+      typescript: this.#typescript,
+      svelte: {
+        generate: 'dom'
+      }
+    };
+    if (this.#deployId) {
+      options.deployId = await this.deployHash;
+    }
+    const {code, external} = await bundle(abspath, options);
+    let newCode = code;
+    for (const [from, imports] of external.entries()) {
+      const statement = `import { ${imports.join(', ')} } from "${from}";`;
+      newCode = `${statement}\n${newCode}`;
+    }
+    return newCode;
+  }
+
+  async bumbleSSR(abspath: string): Promise<BumbleModule<M>> {
     const options: BumbleOptions = {
       dynamicImports: this.#dynamicImports,
       typescript: this.#typescript
     };
     if (this.#deployId) {
-      options.kvPath = this.#kvPath;
       options.deployId = await this.deployHash;
-      if (!this.#cacheReady) {
-        await this.#readyCache();
-      }
+      //   options.kvPath = this.#kvPath;
+      //   await this.#readyCache();
     }
     const {code, external} = await bundle(abspath, options);
     const mod = await importBundle<M>(options, {code, external});
     return mod;
   }
 
+  bumble(abspath: string): Promise<BumbleModule<M>> {
+    return this.bumbleSSR(abspath);
+  }
+
+  /*
   #readyCache = async () => {
+    if (this.#cacheReady) return;
     const hash = await this.deployHash;
     if (!hash) return;
     const db = await Deno.openKv(this.#kvPath);
@@ -57,4 +80,5 @@ export default class Bumble<M> {
     db.close();
     this.#cacheReady = true;
   };
+  */
 }

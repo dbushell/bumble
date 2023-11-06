@@ -47,10 +47,12 @@ export const compileSvelte = async (
   const result = svelte.compile(code, {
     name,
     generate: 'ssr',
+    hydratable: true,
     immutable: true,
     discloseVersion: false,
     enableSourcemap: false,
-    css: 'none'
+    css: 'none',
+    ...options?.svelte
   });
   return result.js.code;
 };
