@@ -6,6 +6,8 @@ export const shrinkLine = (code: string) => {
 
 // Reduce statements to one line for easier parsing
 export const shrinkCode = (code: string) => {
+  // Remove commented statements
+  code = code.replace(/^\s*\/\/\s*(im|ex)port(.*?)$/gm, '');
   // Shrink import/export "from" statements
   code = code.replace(
     /\s*(im|ex)port(.*?)from(.+?);\s*/gs,
@@ -29,11 +31,13 @@ export const shrinkCode = (code: string) => {
   return code;
 };
 
-// Return code and import statements separately
-export const splitLines = (code: string, regexp: RegExp): [string[], string[]] => {
+// Return code in two buckets based on regexp
+export const splitLines = (
+  code: string,
+  regexp: RegExp
+): [string[], string[]] => {
   const pass = [];
   const fail = [];
-  // const regexp = /^\s*import\s+/;
   for (const line of code.split('\n')) {
     if (regexp.test(line)) {
       pass.push(line);
@@ -44,8 +48,8 @@ export const splitLines = (code: string, regexp: RegExp): [string[], string[]] =
   return [pass, fail];
 };
 
-// Parse a single import statement
-export const parseExport = (code: string): string  | string[] => {
+// Parse a single export statement
+export const parseExport = (code: string): string | string[] => {
   if (/^\s*export\s+/.test(code) === false) {
     return [];
   }
@@ -58,7 +62,7 @@ export const parseExport = (code: string): string  | string[] => {
     return namedPattern[1].split(',').map((n) => n.trim());
   }
   throw new Error(`Unsupported export (${code})`);
-}
+};
 
 // Parse a single import statement
 export const parseImport = (code: string): [string[], string] => {

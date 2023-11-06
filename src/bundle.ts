@@ -100,7 +100,7 @@ const compile = async (
     }
     // Otherwise, compile and bundle
     const newCode = await compile(newEntry, bumbler, depth + 1);
-    const [exported, subLines] = splitLines(newCode, /^\s*export\s+/);
+    const [exported, subLines] = splitLines(newCode, /^\s*export\s+(.+?);\s*$/);
     for (const line of exported) {
       const name = parseExport(line);
       if (typeof name === 'string') {
@@ -134,7 +134,7 @@ export const bundle = async (
   };
   // Compile from main entry
   let code = await compile(entry, bumbler);
-  const [imported, codeLines] = splitLines(code, /^\s*import\s+/);
+  const [imported, codeLines] = splitLines(code, /^\s*import\s+(.+?);\s*$/);
   code = codeLines.join('\n');
   // Merge external Svelte imports
   const external = new Map<string, string[]>();

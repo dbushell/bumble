@@ -11,7 +11,6 @@ export const importDynamicBundle = async <M>(
     const statement = `import { ${imports.join(', ')} } from "npm:${from}";`;
     code = `${statement}\n${code}`;
   }
-  // const url = `data:text/javascript;base64,${base64.encodeBase64(code)}`;
   const blob = new Blob([code], {type: 'text/javascript'});
   const url = URL.createObjectURL(blob);
   const mod = await import(url);
@@ -40,7 +39,7 @@ export const importFunctionBundle = async <M>(
       });
     }
   }
-  const [exported, codeLines] = splitLines(code, /^\s*export\s+/);
+  const [exported, codeLines] = splitLines(code, /^\s*export\s+(.+?);\s*$/);
   code = codeLines.join('\n');
   // Return values
   const values: string[] = [];
