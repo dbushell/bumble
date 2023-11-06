@@ -73,7 +73,10 @@ export const parseImport = (code: string): [string[], string] => {
   // RegExp to get module name
   const lineEnd = /('|")(.+?)\1\s*;/;
   // Get import names and module
-  let [, namePart, from] = code.trim().split(/\s*(?:import|from)\s*/);
+  const importIndex = code.indexOf('import');
+  const fromIndex = code.lastIndexOf(' from ');
+  let namePart = code.substring(importIndex + 6, fromIndex).trim();
+  let from = fromIndex > 0 ? code.substring(fromIndex + 6).trim() : '';
   // No named imports
   if (!from && lineEnd.test(namePart)) {
     from = namePart;
@@ -86,7 +89,7 @@ export const parseImport = (code: string): [string[], string] => {
   if (!namePart) {
     throw new Error(`Unnamed imports not supported (${code})`);
   }
-  if (namePart.includes('*') || namePart.includes('as')) {
+  if (namePart.includes('*') || /\s+as\s+/.test(namePart)) {
     throw new Error(`Aliased imports not supported (${code})`);
   }
   // Default import
