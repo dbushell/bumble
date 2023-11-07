@@ -20,7 +20,10 @@ const getName = (entry: string) => {
   const ext = path.extname(entry);
   let name = path.basename(entry, ext);
   if (ext === '.svelte') {
-    name = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+    name = name
+      .split('-')
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join('');
   }
   return name;
 };
