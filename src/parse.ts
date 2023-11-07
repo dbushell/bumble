@@ -10,7 +10,8 @@ export const shrinkCode = (code: string) => {
   code = code.replace(/^\s*\/\/\s*(im|ex)port(.*?)$/gm, '');
   // Shrink import/export "from" statements
   code = code.replace(
-    /\s*(im|ex)port(.*?)from(.+?);\s*/gs,
+    // /^|\s*(im|ex)port(.*?)from(.+?);\s*/gs,
+    /\s*(im|ex)port(.+?)from\s*['"](.+?)['"]\s*;\s*/gs,
     (m) => `\n${shrinkLine(m)}\n`
   );
   // Shrink export lists
@@ -34,12 +35,13 @@ export const shrinkCode = (code: string) => {
 // Return code in two buckets based on regexp
 export const splitLines = (
   code: string,
-  regexp: RegExp
+  regexp: RegExp,
+  validate?: (line: string) => boolean
 ): [string[], string[]] => {
   const pass = [];
   const fail = [];
   for (const line of code.split('\n')) {
-    if (regexp.test(line)) {
+    if (regexp.test(line) && (!validate || validate(line))) {
       pass.push(line);
     } else {
       fail.push(line);
@@ -89,9 +91,9 @@ export const parseImport = (code: string): [string[], string] => {
   if (!namePart) {
     throw new Error(`Unnamed imports not supported (${code})`);
   }
-  // if (namePart.includes('*') || /\s+as\s+/.test(namePart)) {
-  //   throw new Error(`Aliased imports not supported (${code})`);
-  // }
+  if (namePart.includes('*') || /\s+as\s+/.test(namePart)) {
+    throw new Error(`Aliased imports not supported (${code})`);
+  }
   // Default import
   if (/^[\w$]+$/.test(namePart)) {
     names.push(namePart);
@@ -105,4 +107,13 @@ export const parseImport = (code: string): [string[], string] => {
     throw new Error(`Unsupported import (${code})`);
   }
   return [names, from];
+};
+
+export const validateImport = (line: string) => {
+  try {
+    parseImport(line);
+    return true;
+  } catch {
+    return false;
+  }
 };

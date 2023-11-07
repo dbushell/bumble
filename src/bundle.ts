@@ -1,7 +1,13 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './svelte.ts';
 import {transpileTs} from './typescript.ts';
-import {shrinkCode, splitLines, parseImport, parseExport} from './parse.ts';
+import {
+  shrinkCode,
+  splitLines,
+  parseImport,
+  parseExport,
+  validateImport
+} from './parse.ts';
 import type {CompileProps, BumbleBundle, BumbleOptions} from './types.ts';
 
 /** Return unique path for imported file */
@@ -76,7 +82,13 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   for (const line of code.split('\n')) {
     if (!line.trim()) continue;
     // Ignore non import statements
-    let [names, from] = parseImport(line);
+    let names: string[] = [];
+    let from = '';
+    try {
+      [names, from] = parseImport(line);
+    } catch {
+      // Continue...
+    }
     if (names.length !== 1) {
       codeLines.push(line);
       continue;
@@ -141,7 +153,11 @@ export const bundle = async (
   };
   // Compile from main entry
   let code = await compile(props);
-  const [imported, codeLines] = splitLines(code, /^\s*import\s+(.+?);\s*$/);
+  const [imported, codeLines] = splitLines(
+    code,
+    /^\s*import\s+(.+?);\s*$/,
+    validateImport
+  );
   code = codeLines.join('\n');
   // Merge external Svelte imports
   const external = new Map<string, string[]>();
