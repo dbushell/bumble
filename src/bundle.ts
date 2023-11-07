@@ -23,9 +23,10 @@ const getName = (entry: string) => {
 const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   const {dir, entry} = props;
 
-  let code = await Deno.readTextFile(entry);
-
   const importPath = getPath(entry);
+  const ext = path.extname(entry);
+
+  let code = await Deno.readTextFile(entry);
 
   /*
   // Check compiled cache
@@ -47,17 +48,19 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   props.imports.add(importPath);
 
   // Handle Svelte components
-  if (entry.endsWith('.svelte')) {
+  if (ext === '.svelte') {
     code = await compileSvelte(getName(entry), code, props.options);
   }
-  // Handle JS and TypeScript
-  else if (/\.(ts|js)$/.test(entry)) {
-    if (entry.endsWith('.ts')) {
-      code = transpileTs(code, props.options?.typescript);
-    }
+  // Handle TypeScript
+  else if (ext === '.ts') {
+    code = transpileTs(code, props.options?.typescript);
+  }
+  // Handle JSON
+  else if (ext === '.json') {
+    return `const json = ${code};\nexport default json;`;
   }
   // Unknown extension
-  else {
+  else if (ext !== '.js') {
     throw new Error(`Unknown extension (${entry})`);
   }
 
