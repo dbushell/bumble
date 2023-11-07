@@ -5,13 +5,15 @@ import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleModule} from './types.ts';
 
 export default class Bumble<M> {
+  #dir: string;
   // #kvPath: string | undefined;
   #deployId: string | undefined;
   #dynamicImports: boolean;
   #typescript: BumbleOptions['typescript'];
   #cacheReady = false;
 
-  constructor(options?: BumbleOptions) {
+  constructor(dir: string, options?: BumbleOptions) {
+    this.#dir = dir;
     // this.#kvPath = options?.kvPath ?? undefined;
     this.#deployId = options?.deployId ?? undefined;
     this.#dynamicImports = options?.dynamicImports ?? false;
@@ -37,7 +39,7 @@ export default class Bumble<M> {
     if (this.#deployId) {
       options.deployId = await this.deployHash;
     }
-    const {code, external} = await bundle(abspath, options);
+    const {code, external} = await bundle(this.#dir, abspath, options);
     let newCode = code;
     for (const [from, imports] of external.entries()) {
       const statement = `import { ${imports.join(', ')} } from "${from}";`;
@@ -56,7 +58,7 @@ export default class Bumble<M> {
       //   options.kvPath = this.#kvPath;
       //   await this.#readyCache();
     }
-    const {code, external} = await bundle(abspath, options);
+    const {code, external} = await bundle(this.#dir, abspath, options);
     const mod = await importBundle<M>(options, {code, external});
     return mod;
   }

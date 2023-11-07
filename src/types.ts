@@ -34,6 +34,13 @@ export type BumbleModule<M> = M & {
   default: BumbleComponent | CallableFunction;
 };
 
+export interface CompileProps {
+  imports: Set<string>;
+  dir: string;
+  entry: string;
+  options?: BumbleOptions;
+}
+
 declare global {
   interface Window {
     '📦': Record<string, unknown>;

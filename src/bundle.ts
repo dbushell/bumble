@@ -1,13 +1,8 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './svelte.ts';
-import {transpileTs, resolveModule} from './typescript.ts';
+import {transpileTs} from './typescript.ts';
 import {shrinkCode, splitLines, parseImport, parseExport} from './parse.ts';
-import type {BumbleBundle, BumbleOptions} from './types.ts';
-
-interface Bumbler {
-  imports: Set<string>;
-  options?: BumbleOptions;
-}
+import type {CompileProps, BumbleBundle, BumbleOptions} from './types.ts';
 
 /** Return unique path for imported file */
 const getPath = (entry: string) => {
@@ -25,18 +20,16 @@ const getName = (entry: string) => {
 };
 
 /** Recursively compile and bundle files */
-const compile = async (
-  entry: string,
-  bumbler: Bumbler,
-  depth = 0
-): Promise<string> => {
+const compile = async (props: CompileProps, depth = 0): Promise<string> => {
+  const {dir, entry} = props;
+
   let code = await Deno.readTextFile(entry);
 
   const importPath = getPath(entry);
 
   /*
   // Check compiled cache
-  const {kvPath: cachePath, deployId: cacheId} = bumbler.options ?? {};
+  const {kvPath: cachePath, deployId: cacheId} = props.options ?? {};
   if (cacheId) {
     const db = await Deno.openKv(cachePath);
     const cached = await db.get<string>(['cache', cacheId, importPath]);
@@ -48,22 +41,22 @@ const compile = async (
   */
 
   // Check if already compiled
-  if (bumbler.imports.has(importPath)) {
+  if (props.imports.has(importPath)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  bumbler.imports.add(importPath);
+  props.imports.add(importPath);
 
   // Handle Svelte components
   if (entry.endsWith('.svelte')) {
-    code = await compileSvelte(getName(entry), code, bumbler.options);
+    code = await compileSvelte(getName(entry), code, props.options);
   }
   // Handle JS and TypeScript
   else if (/\.(ts|js)$/.test(entry)) {
     if (entry.endsWith('.ts')) {
-      code = transpileTs(code, bumbler.options?.typescript);
+      code = transpileTs(code, props.options?.typescript);
     }
   }
-  // TODO: Handle JSON?
+  // Unknown extension
   else {
     throw new Error(`Unknown extension (${entry})`);
   }
@@ -85,23 +78,26 @@ const compile = async (
       codeLines.push(line);
       continue;
     }
-    if (bumbler.options?.typescript?.paths) {
-      from = resolveModule(from, bumbler.options.typescript.paths);
+    // Resolve relative imports from root directory
+    if (from.startsWith('@')) {
+      from = path.resolve(dir, from.slice(1));
     }
-    // Skip non-relative or unknown imports
-    if ((/^(\.|\/)/.test(from) && /\.(svelte|ts|js)$/.test(entry)) === false) {
+    // Skip non-path or unknown imports
+    if (
+      (/^(\.|\/)/.test(from) && /\.(svelte|ts|js|json)$/.test(entry)) === false
+    ) {
       codeLines.push(line);
       continue;
     }
     const newEntry = path.resolve(path.dirname(entry), from);
     const newPath = getPath(newEntry);
     // Check if import was already compiled
-    if (bumbler.imports.has(newPath)) {
+    if (props.imports.has(newPath)) {
       codeLines.push(`const ${names[0]} = globalThis['🥡'].get('${newPath}');`);
       continue;
     }
     // Otherwise, compile and bundle
-    const newCode = await compile(newEntry, bumbler, depth + 1);
+    const newCode = await compile({...props, entry: newEntry}, depth + 1);
     const [exported, subLines] = splitLines(newCode, /^\s*export\s+(.+?);\s*$/);
     for (const line of exported) {
       const name = parseExport(line);
@@ -129,16 +125,19 @@ const compile = async (
 };
 
 export const bundle = async (
+  dir: string,
   entry: string,
   options?: BumbleOptions
 ): Promise<BumbleBundle> => {
   // Start new bundle
-  const bumbler: Bumbler = {
+  const props: CompileProps = {
     imports: new Set(),
+    dir,
+    entry,
     options
   };
   // Compile from main entry
-  let code = await compile(entry, bumbler);
+  let code = await compile(props);
   const [imported, codeLines] = splitLines(code, /^\s*import\s+(.+?);\s*$/);
   code = codeLines.join('\n');
   // Merge external Svelte imports
