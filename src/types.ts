@@ -1,6 +1,9 @@
 import {typescript, svelte} from './deps.ts';
 
 export interface BumbleOptions {
+  [key: PropertyKey]: unknown;
+  /** Debug output */
+  dev?: boolean;
   // Used to cache compiled routes
   // kvPath?: string;
   /** Used to cache compiled routes (will be hashed) */
@@ -34,11 +37,19 @@ export type BumbleModule<M> = M & {
   default: BumbleComponent | CallableFunction;
 };
 
+export type ParseExportMap = Map<string, string>;
+
+export type ParseImportMap = Map<string, Array<{alias: string; local: string}>>;
+
 export interface CompileProps {
-  imports: Set<string>;
   dir: string;
   entry: string;
   options?: BumbleOptions;
+  imports: Set<string>;
+  external: Array<{
+    from: string;
+    names: Array<{alias: string; local: string}>;
+  }>;
 }
 
 declare global {

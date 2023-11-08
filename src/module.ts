@@ -1,5 +1,5 @@
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
-import {splitLines, parseExport} from './parse.ts';
+import {parseExports} from './parse.ts';
 
 /** Import bundle from a blob URL */
 export const importDynamicBundle = async <M>(
@@ -26,9 +26,17 @@ export const importFunctionBundle = async <M>(
   window['📦'] = {};
   // Needed for Deno Deploy limitations
   const map: Record<string, () => unknown> = {
-    svelte: async () => await import('npm:svelte'),
-    'svelte/store': async () => await import('npm:svelte/store'),
-    'svelte/internal': async () => await import('npm:svelte/internal')
+    svelte: async () => await import('npm:svelte@4.2.2'),
+    'svelte/internal': async () => await import('npm:svelte@4.2.2/internal'),
+    'svelte/internal/disclose-version': async () =>
+      await import('npm:svelte@4.2.2/internal/disclose-version'),
+    'svelte/action': async () => await import('npm:svelte@4.2.2/action'),
+    'svelte/animate': async () => await import('npm:svelte@4.2.2/animate'),
+    'svelte/easing': async () => await import('npm:svelte@4.2.2/easing'),
+    'svelte/elements': async () => await import('npm:svelte@4.2.2/elements'),
+    'svelte/motion': async () => await import('npm:svelte@4.2.2/motion'),
+    'svelte/store': async () => await import('npm:svelte@4.2.2/store'),
+    'svelte/transition': async () => await import('npm:svelte@4.2.2/transition')
   };
   // Reference imports from global namespace
   for (const [from, imports] of external.entries()) {
@@ -39,17 +47,11 @@ export const importFunctionBundle = async <M>(
       });
     }
   }
-  const [exported, codeLines] = splitLines(code, /^\s*export\s+(.+?);\s*$/);
-  code = codeLines.join('\n');
-  // Return values
+  const parsed = parseExports(code);
+  code = parsed.code;
   const values: string[] = [];
-  for (const line of exported) {
-    const name = parseExport(line);
-    if (typeof name === 'string') {
-      values.push(`default: ${name}`);
-    } else if (name.length) {
-      values.push(...name);
-    }
+  for (const [alias, name] of parsed.map) {
+    values.push(`${alias}: ${name}`);
   }
   const statement = `return { ${values.join(', ')} };`;
   code = `'use strict';\n${code}\n${statement}`;

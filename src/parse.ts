@@ -1,119 +1,131 @@
-// Remove newlines and excess whitespace
-export const shrinkLine = (code: string) => {
-  code = code.replace(/\n/g, ' ').replace(/\s+/g, ' ');
-  return code;
-};
+import {acorn} from './deps.ts';
+import type {ParseExportMap, ParseImportMap} from './types.ts';
 
-// Reduce statements to one line for easier parsing
-export const shrinkCode = (code: string) => {
-  // Remove commented statements
-  code = code.replace(/^\s*\/\/\s*(im|ex)port(.*?)$/gm, '');
-  // Shrink import/export "from" statements
-  code = code.replace(
-    // /^|\s*(im|ex)port(.*?)from(.+?);\s*/gs,
-    /\s*(im|ex)port(.+?)from\s*['"](.+?)['"]\s*;\s*/gs,
-    (m) => `\n${shrinkLine(m)}\n`
-  );
-  // Shrink export lists
-  code = code.replace(
-    /\s*export\s*{[^}]+?}\s*;\s*/gs,
-    (m) => `\n${shrinkLine(m)}\n`
-  );
-  // Shrink default exports
-  code = code.replace(
-    /\s*export\s+default\s+[^;{]+?;\s*/gs,
-    (m) => `\n${shrinkLine(m)}\n`
-  );
-  // Shrink named exports
-  code = code.replace(
-    /\s*export\s+(let|const|class|function)\s+(.*?)\s*/gs,
-    (m) => `\n${shrinkLine(m)} `
-  );
-  return code;
-};
-
-// Return code in two buckets based on regexp
-export const splitLines = (
-  code: string,
-  regexp: RegExp,
-  validate?: (line: string) => boolean
-): [string[], string[]] => {
-  const pass = [];
-  const fail = [];
-  for (const line of code.split('\n')) {
-    if (regexp.test(line) && (!validate || validate(line))) {
-      pass.push(line);
-    } else {
-      fail.push(line);
+export const parseExports = (
+  code: string
+): {code: string; map: ParseExportMap} => {
+  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const map: ParseExportMap = new Map();
+  // Negative offset to track removed code
+  let offset = 0;
+  // Loop through all export statements
+  for (const node of ast.body) {
+    if (!node.type.startsWith('Export')) {
+      continue;
+    }
+    // Remove the entire export statement
+    let removeNode = false;
+    // Handle default exports
+    if (node.type === 'ExportDefaultDeclaration') {
+      if (node.declaration.type !== 'Identifier') {
+        throw new Error('Unsupported ExportDefaultDeclaration');
+      }
+      map.set('default', (node.declaration as acorn.Identifier).name);
+      removeNode = true;
+    }
+    // Handle named exports
+    else if (node.type === 'ExportNamedDeclaration') {
+      // Handle declarations
+      if (node.declaration) {
+        if (node.declaration.type === 'VariableDeclaration') {
+          const {name} = node.declaration.declarations[0]
+            .id as acorn.Identifier;
+          map.set(name, name);
+        } else if (node.declaration.type === 'FunctionDeclaration') {
+          const {name} = node.declaration.id as acorn.Identifier;
+          map.set(name, name);
+        } else if (node.declaration.type === 'ClassDeclaration') {
+          const {name} = node.declaration.id as acorn.Identifier;
+          map.set(name, name);
+        }
+        // Remove just the "export" keyword
+        const length = node.declaration.start - node.start;
+        code =
+          code.substring(0, node.start + offset) +
+          code.substring(node.declaration.start + offset);
+        offset -= length;
+      }
+      // Handle specifiers
+      else if (node.specifiers) {
+        removeNode = true;
+        for (const specifier of node.specifiers) {
+          if (specifier.exported.type !== 'Identifier') {
+            console.warn('Unsupported ExportNamedDeclaration');
+          }
+          if (specifier.local.type !== 'Identifier') {
+            console.warn('Unsupported ExportNamedDeclaration');
+          }
+          map.set(
+            (specifier.exported as acorn.Identifier).name,
+            (specifier.local as acorn.Identifier).name
+          );
+        }
+      }
+    }
+    // Handle all exports
+    else if (node.type === 'ExportAllDeclaration') {
+      throw new Error('Export all not supported');
+    }
+    // Remove full export statement
+    if (removeNode) {
+      code =
+        code.substring(0, node.start + offset) +
+        code.substring(node.end + offset);
+      offset -= node.end - node.start;
     }
   }
-  return [pass, fail];
+  return {code, map};
 };
 
-// Parse a single export statement
-export const parseExport = (code: string): string | string[] => {
-  if (/^\s*export\s+/.test(code) === false) {
-    return [];
+export const parseImports = (
+  code: string
+): {code: string; map: ParseImportMap} => {
+  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const map: ParseImportMap = new Map();
+  // Negative offset to track removed code
+  let offset = 0;
+  // Loop through all import statements
+  for (const node of ast.body) {
+    if (node.type !== 'ImportDeclaration') {
+      continue;
+    }
+    // Remove import statement
+    code =
+      code.substring(0, node.start + offset) +
+      code.substring(node.end + offset);
+    offset -= node.end - node.start;
+    // Setup import map
+    const from = map.get(node.source.value as string) ?? [];
+    map.set(node.source.value as string, from);
+    // Loop through named imports
+    for (const specifier of node.specifiers) {
+      // Handle default imports
+      if (specifier.type === 'ImportDefaultSpecifier') {
+        from.push({
+          alias: 'default',
+          local: specifier.local.name
+        });
+        continue;
+      }
+      // Handle namespace imports
+      if (specifier.type === 'ImportNamespaceSpecifier') {
+        from.push({
+          alias: '*',
+          local: specifier.local.name
+        });
+        continue;
+      }
+      // Handle named imports (type: ImportSpecifier)
+      if (specifier.imported.type === 'Identifier') {
+        from.push({
+          alias: (specifier.imported as acorn.Identifier).name,
+          local: specifier.local.name
+        });
+        continue;
+      } else {
+        console.warn('Unsupported ImportSpecifier Literal');
+      }
+    }
   }
-  const defaultPattern = /^\s*export\s+default\s+(.+?)\s*;/.exec(code);
-  if (defaultPattern) {
-    return defaultPattern[1];
-  }
-  const namedPattern = /\s*{(.+?)\}\s*/.exec(code);
-  if (namedPattern) {
-    return namedPattern[1].split(',').map((n) => n.trim());
-  }
-  throw new Error(`Unsupported export (${code})`);
-};
-
-// Parse a single import statement
-export const parseImport = (code: string): [string[], string] => {
-  if (/^\s*import\s+/.test(code) === false) {
-    return [[], ''];
-  }
-  const names: string[] = [];
-  // RegExp to get module name
-  const lineEnd = /('|")(.+?)\1\s*;/;
-  // Get import names and module
-  const importIndex = code.indexOf('import');
-  const fromIndex = code.lastIndexOf(' from ');
-  let namePart = code.substring(importIndex + 6, fromIndex).trim();
-  let from = fromIndex > 0 ? code.substring(fromIndex + 6).trim() : '';
-  // No named imports
-  if (!from && lineEnd.test(namePart)) {
-    from = namePart;
-    namePart = '';
-  }
-  from = lineEnd.exec(from)?.[2].trim()!;
-  if (!from) {
-    throw new Error(`Invalid import (${code})`);
-  }
-  if (!namePart) {
-    throw new Error(`Unnamed imports not supported (${code})`);
-  }
-  if (namePart.includes('*') || /\s+as\s+/.test(namePart)) {
-    throw new Error(`Aliased imports not supported (${code})`);
-  }
-  // Default import
-  if (/^[\w$]+$/.test(namePart)) {
-    names.push(namePart);
-  }
-  // Named imports
-  const named = /\s*{(.+?)\}\s*/.exec(namePart);
-  if (named) {
-    names.push(...named[1].split(',').map((n) => n.trim()));
-  }
-  if (names.length === 0) {
-    throw new Error(`Unsupported import (${code})`);
-  }
-  return [names, from];
-};
-
-export const validateImport = (line: string) => {
-  try {
-    parseImport(line);
-    return true;
-  } catch {
-    return false;
-  }
+  return {code, map};
 };

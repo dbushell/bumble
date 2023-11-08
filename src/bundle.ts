@@ -1,21 +1,10 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './svelte.ts';
 import {transpileTs} from './typescript.ts';
-import {
-  shrinkCode,
-  splitLines,
-  parseImport,
-  parseExport,
-  validateImport
-} from './parse.ts';
+import {parseImports, parseExports} from './parse.ts';
 import type {CompileProps, BumbleBundle, BumbleOptions} from './types.ts';
 
-/** Return unique path for imported file */
-const getPath = (entry: string) => {
-  return path.relative(Deno.cwd(), entry);
-};
-
-/** Return the imported file or component name */
+// Return the imported file or component name
 const getName = (entry: string) => {
   const ext = path.extname(entry);
   let name = path.basename(entry, ext);
@@ -28,33 +17,33 @@ const getName = (entry: string) => {
   return name;
 };
 
-/** Recursively compile and bundle files */
+// Supported file types for relative imports
+const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];
+const supportedType = (entry: string) => {
+  const ext = path.extname(entry);
+  return supportedExtensions.includes(ext);
+};
+
+// Recursively compile and bundle files
 const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   const {dir, entry} = props;
 
-  const importPath = getPath(entry);
+  if (!supportedType(entry)) {
+    throw new Error(`Unsupported file type (${entry})`);
+  }
+
+  const start = performance.now();
+
+  const rel = path.relative(dir, entry);
   const ext = path.extname(entry);
 
-  let code = await Deno.readTextFile(entry);
-
-  /*
-  // Check compiled cache
-  const {kvPath: cachePath, deployId: cacheId} = props.options ?? {};
-  if (cacheId) {
-    const db = await Deno.openKv(cachePath);
-    const cached = await db.get<string>(['cache', cacheId, importPath]);
-    db.close();
-    if (cached.value) {
-      return cached.value;
-    }
-  }
-  */
-
   // Check if already compiled
-  if (props.imports.has(importPath)) {
+  if (props.imports.has(rel)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  props.imports.add(importPath);
+  props.imports.add(rel);
+
+  let code = await Deno.readTextFile(entry);
 
   // Handle Svelte components
   if (ext === '.svelte') {
@@ -68,77 +57,50 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   else if (ext === '.json') {
     return `const json = ${code};\nexport default json;`;
   }
-  // Unknown extension
-  else if (ext !== '.js') {
-    throw new Error(`Unknown extension (${entry})`);
-  }
 
-  // Cleanup code to make line parsing easier
-  code = shrinkCode(code);
+  const parsed = parseImports(code);
+  code = parsed.code;
 
-  const codeLines = [];
-  if (depth === 0) {
-    codeLines.push(`globalThis['🥡'] = new Map();`);
-  }
+  let subCode = '';
 
-  // Iterate over code lines to handle imports
-  for (const line of code.split('\n')) {
-    if (!line.trim()) continue;
-    // Ignore non import statements
-    let names: string[] = [];
-    let from = '';
-    try {
-      [names, from] = parseImport(line);
-    } catch {
-      // Continue...
-    }
-    if (names.length !== 1) {
-      codeLines.push(line);
-      continue;
-    }
-    // Resolve relative imports from root directory
+  for (let [from, names] of parsed.map) {
     if (from.startsWith('@')) {
       from = path.resolve(dir, from.slice(1));
     }
-    // Skip non-path or unknown imports
-    if (
-      (/^(\.|\/)/.test(from) && /\.(svelte|ts|js|json)$/.test(entry)) === false
-    ) {
-      codeLines.push(line);
+    if ((/^(\.|\/)/.test(from) && supportedType(entry)) === false) {
+      props.external.push({from, names});
       continue;
     }
     const newEntry = path.resolve(path.dirname(entry), from);
-    const newPath = getPath(newEntry);
-    // Check if import was already compiled
-    if (props.imports.has(newPath)) {
-      codeLines.push(`const ${names[0]} = globalThis['🥡'].get('${newPath}');`);
+    const newRel = path.relative(dir, newEntry);
+    if (props.imports.has(newRel)) {
+      for (const name of names) {
+        const line = `const ${name.local} = globalThis['🥡'].get('${newRel}').${name.alias};`;
+        code = `${line}\n${code}`;
+      }
       continue;
     }
-    // Otherwise, compile and bundle
-    const newCode = await compile({...props, entry: newEntry}, depth + 1);
-    const [exported, subLines] = splitLines(newCode, /^\s*export\s+(.+?);\s*$/);
-    for (const line of exported) {
-      const name = parseExport(line);
-      if (typeof name === 'string') {
-        subLines.push(`globalThis['🥡'].set('${newPath}', ${name});`);
-      } else {
-        subLines.push(line);
-      }
+    let newCode = await compile({...props, entry: newEntry}, depth + 1);
+    const parsed = parseExports(newCode);
+    newCode = parsed.code;
+    for (const [alias, name] of parsed.map) {
+      newCode += `\n{ let M = globalThis['🥡']; let K = '${newRel}'; M.set(K, {...M.get(K) ?? {}, ${alias}: ${name}}); }\n`;
     }
-    // TODO: check for default export?
-    codeLines.push(`/* ${newPath} */`, '{', subLines.join('\n'), '}');
-    codeLines.push(`const ${names[0]} = globalThis['🥡'].get('${newPath}');`);
+    subCode += `/* ${newRel} */\n{\n${newCode}\n}\n`;
+    code = `const ${names[0].local} = globalThis['🥡'].get('${newRel}').${names[0].alias};\n${code}\n`;
   }
-  // Return compiled code and cache if enabled
-  code = codeLines.join('\n');
 
-  /*
-  if (cacheId) {
-    const db = await Deno.openKv(cachePath);
-    await db.set(['cache', cacheId, importPath], code);
-    db.close();
+  code = `${subCode}\n${code}`;
+
+  if (depth === 0) {
+    code = `globalThis['🥡'] = new Map();\n${code}\n`;
   }
-  */
+
+  if (props.options?.dev) {
+    const time = (performance.now() - start).toFixed(2);
+    console.log(`🥢 ${time}ms (${rel})`);
+  }
+
   return code;
 };
 
@@ -147,29 +109,30 @@ export const bundle = async (
   entry: string,
   options?: BumbleOptions
 ): Promise<BumbleBundle> => {
+  const start = performance.now();
   // Start new bundle
   const props: CompileProps = {
-    imports: new Set(),
     dir,
     entry,
-    options
+    options,
+    imports: new Set(),
+    external: []
   };
   // Compile from main entry
-  let code = await compile(props);
-  const [imported, codeLines] = splitLines(
-    code,
-    /^\s*import\s+(.+?);\s*$/,
-    validateImport
-  );
-  code = codeLines.join('\n');
-  // Merge external Svelte imports
+  const code = await compile(props);
+  // Reduce external imports to remove duplicates
   const external = new Map<string, string[]>();
-  for (const line of imported) {
-    const [names, from] = parseImport(line);
+  for (const {from, names} of props.external!) {
     if (!from.startsWith('svelte')) {
-      throw new Error(`Unknown import (${entry}) (${line})`);
+      throw new Error(`Unknown import (${entry}) (${from})`);
     }
-    external.set(from, [...new Set([...(external.get(from) || []), ...names])]);
+    external.set(from, [
+      ...new Set([...(external.get(from) || []), ...names.map((n) => n.alias)])
+    ]);
+  }
+  if (options?.dev) {
+    const time = (performance.now() - start).toFixed(2);
+    console.log(`🥡 ${time}ms (${path.relative(dir, entry)})`);
   }
   return {code, external};
 };
