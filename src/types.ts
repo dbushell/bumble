@@ -26,7 +26,10 @@ export interface BumbleBundle {
 // Partial of `create_ssr_component` return type:
 // https://github.com/sveltejs/svelte/blob/master/packages/svelte/src/runtime/internal/ssr.js
 export interface BumbleComponent {
-  render: (props?: Record<string, unknown>) => {
+  render: (
+    props?: Record<string, unknown>,
+    options?: {context?: Map<string, unknown>}
+  ) => {
     html: string;
     css?: {code: string};
     head?: string;
