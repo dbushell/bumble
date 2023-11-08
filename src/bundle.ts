@@ -107,7 +107,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
 export const bundle = async (
   dir: string,
   entry: string,
-  options?: BumbleOptions
+  options: BumbleOptions
 ): Promise<BumbleBundle> => {
   const start = performance.now();
   // Start new bundle

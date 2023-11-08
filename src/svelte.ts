@@ -56,3 +56,18 @@ export const compileSvelte = async (
   });
   return result.js.code;
 };
+
+// Needed for Deno Deploy limitations
+export const svelteMap: Record<string, () => Promise<unknown>> = {
+  svelte: () => import('npm:svelte@4.2.2'),
+  'svelte/action': () => import('npm:svelte@4.2.2/action'),
+  'svelte/animate': () => import('npm:svelte@4.2.2/animate'),
+  'svelte/easing': () => import('npm:svelte@4.2.2/easing'),
+  'svelte/elements': () => import('npm:svelte@4.2.2/elements'),
+  'svelte/motion': () => import('npm:svelte@4.2.2/motion'),
+  'svelte/store': () => import('npm:svelte@4.2.2/store'),
+  'svelte/transition': () => import('npm:svelte@4.2.2/transition'),
+  'svelte/internal': () => import('npm:svelte@4.2.2/internal'),
+  'svelte/internal/disclose-version': () =>
+    import('npm:svelte@4.2.2/internal/disclose-version')
+};

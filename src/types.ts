@@ -47,7 +47,7 @@ export type ParseImportMap = Map<string, Array<{alias: string; local: string}>>;
 export interface CompileProps {
   dir: string;
   entry: string;
-  options?: BumbleOptions;
+  options: BumbleOptions;
   imports: Set<string>;
   external: Array<{
     from: string;
