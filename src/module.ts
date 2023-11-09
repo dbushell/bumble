@@ -1,5 +1,5 @@
-import {parseExports} from './parse.ts';
-import {svelteMap} from './svelte.ts';
+import {parseExports} from './lib/acorn.ts';
+import {svelteMap} from './lib/svelte.ts';
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */

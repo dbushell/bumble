@@ -1,4 +1,4 @@
-import {typescript} from './deps.ts';
+import {typescript} from '../deps.ts';
 
 export const compilerOptions: typescript.CompilerOptions = {
   module: typescript.ModuleKind.ESNext,

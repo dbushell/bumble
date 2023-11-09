@@ -1,7 +1,7 @@
 import {path} from './deps.ts';
-import {compileSvelte} from './svelte.ts';
-import {transpileTs} from './typescript.ts';
-import {parseImports, parseExports} from './parse.ts';
+import {compileSvelte} from './lib/svelte.ts';
+import {transpileTs} from './lib/typescript.ts';
+import {parseImports, parseExports} from './lib/acorn.ts';
 import type {CompileProps, BumbleBundle, BumbleOptions} from './types.ts';
 
 // Return the imported file or component name

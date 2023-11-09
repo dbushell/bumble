@@ -1,5 +1,5 @@
-import {acorn} from './deps.ts';
-import type {ParseExportMap, ParseImportMap} from './types.ts';
+import {acorn} from '../deps.ts';
+import type {ParseExportMap, ParseImportMap} from '../types.ts';
 
 export const parseExports = (
   code: string

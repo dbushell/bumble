@@ -1,11 +1,11 @@
 import {path, deepMerge} from './deps.ts';
 import {bundle} from './bundle.ts';
 import {importBundle} from './module.ts';
-import {compilerOptions} from './typescript.ts';
+import {compilerOptions} from './lib/typescript.ts';
 import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleModule} from './types.ts';
 
-export default class Bumble<M> {
+export class Bumbler<M> {
   #dir: string;
   #options: BumbleOptions;
 

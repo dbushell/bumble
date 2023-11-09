@@ -1,6 +1,6 @@
-import {svelte} from './deps.ts';
+import {svelte} from '../deps.ts';
 import {transpileTs} from './typescript.ts';
-import type {BumbleOptions} from './types.ts';
+import type {BumbleOptions} from '../types.ts';
 
 export const processSvelte = async (
   code: string,
