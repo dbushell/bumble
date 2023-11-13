@@ -2,7 +2,12 @@ import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
 import {parseImports, parseExports} from './lib/acorn.ts';
-import type {CompileProps, BumbleBundle, BumbleOptions} from './types.ts';
+import type {
+  BumbleOptions,
+  BumbleManifest,
+  BumbleBundle,
+  CompileProps
+} from './types.ts';
 
 // Return the imported file or component name
 const getName = (entry: string) => {
@@ -26,7 +31,11 @@ const supportedType = (entry: string) => {
 
 // Recursively compile and bundle files
 const compile = async (props: CompileProps, depth = 0): Promise<string> => {
-  const {dir, entry} = props;
+  const {
+    entry,
+    imports,
+    manifest: {dir}
+  } = props;
 
   if (!supportedType(entry)) {
     throw new Error(`Unsupported file type (${entry})`);
@@ -37,11 +46,15 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   const rel = path.relative(dir, entry);
   const ext = path.extname(entry);
 
+  if (!props.manifest.dependencies.has(entry)) {
+    props.manifest.dependencies.set(entry, []);
+  }
+
   // Check if already compiled
-  if (props.imports.has(rel)) {
+  if (imports.has(rel)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  props.imports.add(rel);
+  imports.add(rel);
 
   let code = await Deno.readTextFile(entry);
 
@@ -73,7 +86,8 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
     }
     const newEntry = path.resolve(path.dirname(entry), from);
     const newRel = path.relative(dir, newEntry);
-    if (props.imports.has(newRel)) {
+    props.manifest.dependencies.get(entry)?.push(newEntry);
+    if (imports.has(newRel)) {
       for (const name of names) {
         const line = `const ${name.local} = globalThis['🥡'].get('${newRel}').${name.alias};`;
         code = `${line}\n${code}`;
@@ -104,35 +118,43 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   return code;
 };
 
-export const bundle = async (
+export const bundleModule = async (
   dir: string,
   entry: string,
   options: BumbleOptions
 ): Promise<BumbleBundle> => {
   const start = performance.now();
-  // Start new bundle
-  const props: CompileProps = {
+  const manifest: BumbleManifest = {
     dir,
     entry,
+    dependencies: new Map(),
+    external: new Map()
+  };
+  // Start new bundle
+  const props: CompileProps = {
+    entry,
     options,
-    imports: new Set(),
-    external: []
+    manifest,
+    external: [],
+    imports: new Set()
   };
   // Compile from main entry
   const code = await compile(props);
   // Reduce external imports to remove duplicates
-  const external = new Map<string, string[]>();
   for (const {from, names} of props.external!) {
     if (!from.startsWith('svelte')) {
       throw new Error(`Unknown import (${entry}) (${from})`);
     }
-    external.set(from, [
-      ...new Set([...(external.get(from) || []), ...names.map((n) => n.alias)])
+    manifest.external.set(from, [
+      ...new Set([
+        ...(manifest.external.get(from) || []),
+        ...names.map((n) => n.alias)
+      ])
     ]);
   }
   if (options?.dev) {
     const time = (performance.now() - start).toFixed(2);
     console.log(`🥡 ${time}ms (${path.relative(dir, entry)})`);
   }
-  return {code, external};
+  return {code, manifest};
 };

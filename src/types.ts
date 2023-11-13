@@ -14,11 +14,16 @@ export interface BumbleOptions {
   svelte?: svelte.CompileOptions;
 }
 
-export interface BumbleBundle {
-  /** Compiled and bundled code */
-  code: string;
-  /** List of external imports */
+export interface BumbleManifest {
+  dir: string;
+  entry: string;
+  dependencies: Map<string, string[]>;
   external: Map<string, string[]>;
+}
+
+export interface BumbleBundle {
+  code: string;
+  manifest: BumbleManifest;
 }
 
 // Partial of `create_ssr_component` return type:
@@ -43,9 +48,9 @@ export type ParseExportMap = Map<string, string>;
 export type ParseImportMap = Map<string, Array<{alias: string; local: string}>>;
 
 export interface CompileProps {
-  dir: string;
   entry: string;
   options: BumbleOptions;
+  manifest: BumbleManifest;
   imports: Set<string>;
   external: Array<{
     from: string;

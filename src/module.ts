@@ -6,9 +6,9 @@ import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 export const importDynamicBundle = async <M>(
   bundle: BumbleBundle
 ): Promise<BumbleModule<M>> => {
-  let {code, external} = bundle;
+  let {code, manifest} = bundle;
   // Append import statements
-  for (const [from, names] of external.entries()) {
+  for (const [from, names] of manifest.external.entries()) {
     code = `import {${names.join(',')}} from "npm:${from}";\n${code}`;
   }
   const blob = new Blob([code], {type: 'text/javascript'});
@@ -22,10 +22,10 @@ export const importDynamicBundle = async <M>(
 export const importFunctionBundle = async <M>(
   bundle: BumbleBundle
 ): Promise<BumbleModule<M>> => {
-  let {code, external} = bundle;
+  let {code, manifest} = bundle;
   // Reference imports from global
   window['📦'] = {};
-  for (const [from, names] of external.entries()) {
+  for (const [from, names] of manifest.external.entries()) {
     if (Object.hasOwn(svelteMap, from)) {
       window['📦'][from] = await svelteMap[from]();
       names.forEach((name) => {
