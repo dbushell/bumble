@@ -8,6 +8,8 @@ export interface BumbleOptions {
   deployId?: string;
   /** Dynamic imports are faster and safer */
   dynamicImports?: boolean;
+  /** Exclusive list of top-level bundle exports */
+  filterExports?: string[];
   /** TypeScript compiler options */
   typescript?: typescript.CompilerOptions;
   /** Svelte compiler options */

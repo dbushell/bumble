@@ -1,7 +1,7 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
-import {parseImports, parseExports} from './lib/acorn.ts';
+import {parseImports, parseExports, filterExports} from './lib/acorn.ts';
 import type {
   BumbleOptions,
   BumbleManifest,
@@ -98,7 +98,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
     const parsed = parseExports(newCode);
     newCode = parsed.code;
     for (const [alias, name] of parsed.map) {
-      newCode += `\n{ let M = $$$; let K = '${newRel}'; M.set(K, {...M.get(K) ?? {}, ${alias}: ${name}}); }\n`;
+      newCode += `\n{ let K = '${newRel}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }\n`;
     }
     subCode += `/* ${newRel} */\n{\n${newCode}\n}\n`;
     code = `const ${names[0].local} = $$$.get('${newRel}').${names[0].alias};\n${code}\n`;
@@ -113,6 +113,10 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   if (props.options?.dev) {
     const time = (performance.now() - start).toFixed(2);
     console.log(`🥢 ${time}ms (${rel})`);
+  }
+
+  if (depth === 0 && props.options?.filterExports) {
+    code = filterExports(code, props.options.filterExports);
   }
 
   return code;

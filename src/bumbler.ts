@@ -31,8 +31,9 @@ export class Bumbler<M> {
     );
   }
 
-  async bumbleDOM(abspath: string): Promise<string> {
-    const options = deepMerge<BumbleOptions>(this.#options, {
+  async bumbleDOM(abspath: string, options?: BumbleOptions): Promise<string> {
+    options = deepMerge<BumbleOptions>(this.#options, options ?? {});
+    options = deepMerge<BumbleOptions>(options, {
       svelte: {
         generate: 'dom'
       }
@@ -50,9 +51,11 @@ export class Bumbler<M> {
   }
 
   async bumbleSSR(
-    abspath: string
+    abspath: string,
+    options?: BumbleOptions
   ): Promise<{manifest: BumbleManifest; mod: BumbleModule<M>}> {
-    const options = deepMerge<BumbleOptions>(this.#options, {
+    options = deepMerge<BumbleOptions>(this.#options, options ?? {});
+    options = deepMerge<BumbleOptions>(options, {
       svelte: {
         generate: 'ssr'
       }

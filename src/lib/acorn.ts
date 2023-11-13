@@ -1,82 +1,6 @@
 import {acorn} from '../deps.ts';
 import type {ParseExportMap, ParseImportMap} from '../types.ts';
 
-export const parseExports = (
-  code: string
-): {code: string; map: ParseExportMap} => {
-  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
-  const map: ParseExportMap = new Map();
-  // Negative offset to track removed code
-  let offset = 0;
-  // Loop through all export statements
-  for (const node of ast.body) {
-    if (!node.type.startsWith('Export')) {
-      continue;
-    }
-    // Remove the entire export statement
-    let removeNode = false;
-    // Handle default exports
-    if (node.type === 'ExportDefaultDeclaration') {
-      if (node.declaration.type !== 'Identifier') {
-        throw new Error('Unsupported ExportDefaultDeclaration');
-      }
-      map.set('default', (node.declaration as acorn.Identifier).name);
-      removeNode = true;
-    }
-    // Handle named exports
-    else if (node.type === 'ExportNamedDeclaration') {
-      // Handle declarations
-      if (node.declaration) {
-        if (node.declaration.type === 'VariableDeclaration') {
-          const {name} = node.declaration.declarations[0]
-            .id as acorn.Identifier;
-          map.set(name, name);
-        } else if (node.declaration.type === 'FunctionDeclaration') {
-          const {name} = node.declaration.id as acorn.Identifier;
-          map.set(name, name);
-        } else if (node.declaration.type === 'ClassDeclaration') {
-          const {name} = node.declaration.id as acorn.Identifier;
-          map.set(name, name);
-        }
-        // Remove just the "export" keyword
-        const length = node.declaration.start - node.start;
-        code =
-          code.substring(0, node.start + offset) +
-          code.substring(node.declaration.start + offset);
-        offset -= length;
-      }
-      // Handle specifiers
-      else if (node.specifiers) {
-        removeNode = true;
-        for (const specifier of node.specifiers) {
-          if (specifier.exported.type !== 'Identifier') {
-            console.warn('Unsupported ExportNamedDeclaration');
-          }
-          if (specifier.local.type !== 'Identifier') {
-            console.warn('Unsupported ExportNamedDeclaration');
-          }
-          map.set(
-            (specifier.exported as acorn.Identifier).name,
-            (specifier.local as acorn.Identifier).name
-          );
-        }
-      }
-    }
-    // Handle all exports
-    else if (node.type === 'ExportAllDeclaration') {
-      throw new Error('Export all not supported');
-    }
-    // Remove full export statement
-    if (removeNode) {
-      code =
-        code.substring(0, node.start + offset) +
-        code.substring(node.end + offset);
-      offset -= node.end - node.start;
-    }
-  }
-  return {code, map};
-};
-
 export const parseImports = (
   code: string
 ): {code: string; map: ParseImportMap} => {
@@ -128,4 +52,128 @@ export const parseImports = (
     }
   }
   return {code, map};
+};
+
+export const parseExports = (
+  code: string
+): {code: string; map: ParseExportMap} => {
+  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const map: ParseExportMap = new Map();
+  // Negative offset to track removed code
+  let offset = 0;
+  // Loop through all export statements
+  for (const node of ast.body) {
+    if (!node.type.startsWith('Export')) {
+      continue;
+    }
+    // Remove the entire export statement
+    let removeNode = false;
+    // Handle default exports
+    if (node.type === 'ExportDefaultDeclaration') {
+      if (node.declaration.type !== 'Identifier') {
+        throw new Error('Unsupported ExportDefaultDeclaration');
+      }
+      map.set('default', (node.declaration as acorn.Identifier).name);
+      removeNode = true;
+    }
+    // Handle named exports
+    else if (node.type === 'ExportNamedDeclaration') {
+      // Handle declarations
+      if (node.declaration) {
+        let identifier: acorn.Identifier | undefined;
+        if (node.declaration.type === 'VariableDeclaration') {
+          identifier = node.declaration.declarations[0].id as acorn.Identifier;
+        } else if (node.declaration.type === 'FunctionDeclaration') {
+          identifier = node.declaration.id as acorn.Identifier;
+        } else if (node.declaration.type === 'ClassDeclaration') {
+          identifier = node.declaration.id as acorn.Identifier;
+        }
+        if (!identifier) {
+          throw new Error('Unsupported ExportNamedDeclaration');
+        }
+        map.set(identifier.name, identifier.name);
+        // Remove just the "export" keyword
+        const length = node.declaration.start - node.start;
+        code =
+          code.substring(0, node.start + offset) +
+          code.substring(node.declaration.start + offset);
+        offset -= length;
+      }
+      // Handle specifiers
+      else if (node.specifiers) {
+        removeNode = true;
+        for (const specifier of node.specifiers) {
+          if (specifier.exported.type !== 'Identifier') {
+            console.warn('Unsupported ExportNamedDeclaration');
+          }
+          if (specifier.local.type !== 'Identifier') {
+            console.warn('Unsupported ExportNamedDeclaration');
+          }
+          map.set(
+            (specifier.exported as acorn.Identifier).name,
+            (specifier.local as acorn.Identifier).name
+          );
+        }
+      }
+    }
+    // Handle all exports
+    else if (node.type === 'ExportAllDeclaration') {
+      throw new Error('Export all not supported');
+    }
+    // Remove full export statement
+    if (removeNode) {
+      code =
+        code.substring(0, node.start + offset) +
+        code.substring(node.end + offset);
+      offset -= node.end - node.start;
+    }
+  }
+  return {code, map};
+};
+
+export const filterExports = (code: string, allowed: string[]): string => {
+  const parsed = parseExports(code);
+  code = parsed.code;
+  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  // Negative offset to track removed code
+  let offset = 0;
+  // Invert export map to lookup local names
+  const localMap = new Map<string, string>();
+  parsed.map.forEach((v, k) => localMap.set(v, k));
+  for (const node of ast.body) {
+    const locals: string[] = [];
+    if (node.type === 'VariableDeclaration') {
+      // TODO: handle multiple declarations?
+      node.declarations.forEach((d) => {
+        locals.push((d.id as acorn.Identifier).name);
+      });
+    } else if (node.type === 'FunctionDeclaration') {
+      locals.push(node.id.name);
+    } else if (node.type === 'ClassDeclaration') {
+      locals.push(node.id.name);
+    }
+    for (const name of locals) {
+      if (!localMap.has(name)) {
+        continue;
+      }
+      if (allowed.includes(localMap.get(name)!)) {
+        continue;
+      }
+      code =
+        code.substring(0, node.start + offset) +
+        code.substring(node.end + offset);
+      offset -= node.end - node.start;
+      break;
+    }
+  }
+  // Append allowed exports in a single statement
+  const parts = [];
+  for (const [alias, name] of parsed.map) {
+    if (!allowed.includes(alias)) {
+      continue;
+    }
+    parts.push(alias === name ? name : `${name} as ${alias}`);
+  }
+  code += `\nexport { ${parts.join(', ')} };\n`;
+  return code;
 };
