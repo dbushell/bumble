@@ -89,7 +89,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
     props.manifest.dependencies.get(entry)?.push(newEntry);
     if (imports.has(newRel)) {
       for (const name of names) {
-        const line = `const ${name.local} = globalThis['🥡'].get('${newRel}').${name.alias};`;
+        const line = `const ${name.local} = $$$.get('${newRel}').${name.alias};`;
         code = `${line}\n${code}`;
       }
       continue;
@@ -98,16 +98,16 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
     const parsed = parseExports(newCode);
     newCode = parsed.code;
     for (const [alias, name] of parsed.map) {
-      newCode += `\n{ let M = globalThis['🥡']; let K = '${newRel}'; M.set(K, {...M.get(K) ?? {}, ${alias}: ${name}}); }\n`;
+      newCode += `\n{ let M = $$$; let K = '${newRel}'; M.set(K, {...M.get(K) ?? {}, ${alias}: ${name}}); }\n`;
     }
     subCode += `/* ${newRel} */\n{\n${newCode}\n}\n`;
-    code = `const ${names[0].local} = globalThis['🥡'].get('${newRel}').${names[0].alias};\n${code}\n`;
+    code = `const ${names[0].local} = $$$.get('${newRel}').${names[0].alias};\n${code}\n`;
   }
 
   code = `${subCode}\n${code}`;
 
   if (depth === 0) {
-    code = `globalThis['🥡'] = new Map();\n${code}\n`;
+    code = `const $$$ = new Map();\n${code}\n`;
   }
 
   if (props.options?.dev) {
