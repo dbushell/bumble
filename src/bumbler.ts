@@ -25,29 +25,32 @@ export class Bumbler<M> {
     return this.#options.dev ?? false;
   }
 
-  get deployHash(): Promise<string> {
+  get deployHash(): Promise<string | undefined> {
     return Promise.resolve(
-      this.#options.deployId ? encodeHash(this.#options.deployId, 'SHA-1') : ''
+      this.#options.deployId
+        ? encodeHash(this.#options.deployId, 'SHA-1')
+        : undefined
     );
   }
 
   async bumbleDOM(abspath: string, options?: BumbleOptions): Promise<string> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
+      deployId: await this.deployHash,
       svelte: {
         generate: 'dom'
       }
     });
-    if (options.deployId) {
-      options.deployId = await this.deployHash;
-    }
-    const {code, manifest} = await bundleModule(this.#dir, abspath, options);
-    let newCode = code;
+    const {script, manifest} = await bundleModule(this.#dir, abspath, options);
+    let code = script.getCode({
+      exports: true,
+      filterExports: options?.filterExports
+    });
     for (const [from, imports] of manifest.external.entries()) {
       const statement = `import { ${imports.join(', ')} } from "${from}";`;
-      newCode = `${statement}\n${newCode}`;
+      code = `${statement}\n${code}`;
     }
-    return newCode;
+    return code;
   }
 
   async bumbleSSR(
@@ -56,17 +59,15 @@ export class Bumbler<M> {
   ): Promise<{manifest: BumbleManifest; mod: BumbleModule<M>}> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
+      deployId: await this.deployHash,
       svelte: {
         generate: 'ssr'
       }
     });
-    if (options.deployId) {
-      options.deployId = await this.deployHash;
-    }
     const s1 = performance.now();
-    const {code, manifest} = await bundleModule(this.#dir, abspath, options);
+    const bundle = await bundleModule(this.#dir, abspath, options);
     const s2 = performance.now();
-    const mod = await importBundle<M>(options, {code, manifest});
+    const mod = await importBundle<M>(bundle, options);
     if (options.dev) {
       const rel = path.relative(this.#dir, abspath);
       const t2 = (performance.now() - s2).toFixed(2);
@@ -74,10 +75,6 @@ export class Bumbler<M> {
       const t1 = (performance.now() - s1).toFixed(2);
       console.log(`🐝 ${t1}ms (${rel})`);
     }
-    return {manifest, mod};
-  }
-
-  bumble(abspath: string) {
-    return this.bumbleSSR(abspath);
+    return {mod, manifest: bundle.manifest};
   }
 }

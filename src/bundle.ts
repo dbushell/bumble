@@ -1,7 +1,7 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
-import {parseImports, parseExports, filterExports} from './lib/acorn.ts';
+import Script from './script.ts';
 import type {
   BumbleOptions,
   BumbleManifest,
@@ -9,35 +9,16 @@ import type {
   CompileProps
 } from './types.ts';
 
-// Return the imported file or component name
-const getName = (entry: string) => {
-  const ext = path.extname(entry);
-  let name = path.basename(entry, ext);
-  if (ext === '.svelte') {
-    name = name
-      .split('-')
-      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-      .join('');
-  }
-  return name;
-};
-
-// Supported file types for relative imports
-const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];
-const supportedType = (entry: string) => {
-  const ext = path.extname(entry);
-  return supportedExtensions.includes(ext);
-};
+const codeCache = new Map<string, string>();
 
 // Recursively compile and bundle files
-const compile = async (props: CompileProps, depth = 0): Promise<string> => {
+const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
   const {
     entry,
-    imports,
-    manifest: {dir}
+    manifest: {dir, dependencies}
   } = props;
 
-  if (!supportedType(entry)) {
+  if (!Script.supportedType(entry)) {
     throw new Error(`Unsupported file type (${entry})`);
   }
 
@@ -46,68 +27,73 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
   const rel = path.relative(dir, entry);
   const ext = path.extname(entry);
 
-  if (!props.manifest.dependencies.has(entry)) {
-    props.manifest.dependencies.set(entry, []);
+  if (!dependencies.has(entry)) {
+    dependencies.set(entry, []);
   }
 
   // Check if already compiled
-  if (imports.has(rel)) {
+  if (props.compiled.has(rel)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  imports.add(rel);
+  props.compiled.add(rel);
 
-  let code = await Deno.readTextFile(entry);
+  let code: string;
 
-  // Handle Svelte components
-  if (ext === '.svelte') {
-    code = await compileSvelte(getName(entry), code, props.options);
+  let cacheKey = entry;
+  if (props.options.svelte?.generate) {
+    cacheKey = `${cacheKey}-${props.options.svelte.generate}`;
   }
-  // Handle TypeScript
-  else if (ext === '.ts') {
-    code = transpileTs(code, props.options?.typescript);
-  }
-  // Handle JSON
-  else if (ext === '.json') {
-    return `const json = ${code};\nexport default json;`;
-  }
-
-  const parsed = parseImports(code);
-  code = parsed.code;
-
-  let subCode = '';
-
-  for (let [from, names] of parsed.map) {
-    if (from.startsWith('@')) {
-      from = path.resolve(dir, from.slice(1));
+  if (codeCache.has(cacheKey)) {
+    code = codeCache.get(cacheKey)!;
+  } else {
+    code = await Deno.readTextFile(entry);
+    // Convert formats to JavaScript
+    if (ext === '.svelte') {
+      code = await compileSvelte(entry, code, props.options);
+    } else if (ext === '.ts') {
+      code = transpileTs(code, props.options?.typescript);
+    } else if (ext === '.json') {
+      code = `const json = ${code};\nexport default json;`;
     }
-    if ((/^(\.|\/)/.test(from) && supportedType(entry)) === false) {
-      props.external.push({from, names});
-      continue;
-    }
-    const newEntry = path.resolve(path.dirname(entry), from);
+    codeCache.set(cacheKey, code);
+  }
+  // Return immediately (no imports or exports)
+  if (ext === '.json') {
+    return new Script(code, entry, dir);
+  }
+
+  const script = new Script(code, entry, dir);
+
+  for (const [from, names] of script.externalImports) {
+    props.external.push({from, names});
+  }
+
+  const prepend = [];
+
+  for (const [newEntry, names] of script.localImports) {
     const newRel = path.relative(dir, newEntry);
-    props.manifest.dependencies.get(entry)?.push(newEntry);
-    if (imports.has(newRel)) {
-      for (const name of names) {
-        const line = `const ${name.local} = $$$.get('${newRel}').${name.alias};`;
-        code = `${line}\n${code}`;
+    dependencies.get(entry)?.push(newEntry);
+    if (props.compiled.has(newRel)) {
+      for (const {local, alias} of names) {
+        script.prepend(`const ${local} = $$$.get('${newRel}').${alias};`);
       }
       continue;
     }
-    let newCode = await compile({...props, entry: newEntry}, depth + 1);
-    const parsed = parseExports(newCode);
-    newCode = parsed.code;
-    for (const [alias, name] of parsed.map) {
-      newCode += `\n{ let K = '${newRel}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }\n`;
+    const newScript = await compile({...props, entry: newEntry}, depth + 1);
+    for (const [alias, name] of newScript.exports) {
+      newScript.append(
+        `{ let K = '${newRel}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }`
+      );
     }
-    subCode += `/* ${newRel} */\n{\n${newCode}\n}\n`;
-    code = `const ${names[0].local} = $$$.get('${newRel}').${names[0].alias};\n${code}\n`;
+    prepend.push(`/* ${newRel} */\n{\n${newScript.getCode()}\n}\n`);
+    script.prepend(
+      `const ${names[0].local} = $$$.get('${newRel}').${names[0].alias};`
+    );
   }
 
-  code = `${subCode}\n${code}`;
-
+  script.prepend(prepend.join('\n'));
   if (depth === 0) {
-    code = `const $$$ = new Map();\n${code}\n`;
+    script.prepend(`const $$$ = new Map();`);
   }
 
   if (props.options?.dev) {
@@ -115,11 +101,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<string> => {
     console.log(`🥢 ${time}ms (${rel})`);
   }
 
-  if (depth === 0 && props.options?.filterExports) {
-    code = filterExports(code, props.options.filterExports);
-  }
-
-  return code;
+  return script;
 };
 
 export const bundleModule = async (
@@ -140,10 +122,10 @@ export const bundleModule = async (
     options,
     manifest,
     external: [],
-    imports: new Set()
+    compiled: new Set()
   };
   // Compile from main entry
-  const code = await compile(props);
+  const script = await compile(props);
   // Reduce external imports to remove duplicates
   for (const {from, names} of props.external!) {
     if (!from.startsWith('svelte')) {
@@ -160,5 +142,5 @@ export const bundleModule = async (
     const time = (performance.now() - start).toFixed(2);
     console.log(`🥡 ${time}ms (${path.relative(dir, entry)})`);
   }
-  return {code, manifest};
+  return {script, manifest};
 };

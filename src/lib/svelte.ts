@@ -1,6 +1,18 @@
-import {svelte} from '../deps.ts';
+import {path, svelte} from '../deps.ts';
 import {transpileTs} from './typescript.ts';
 import type {BumbleOptions} from '../types.ts';
+
+const componentName = (entry: string) => {
+  const ext = path.extname(entry);
+  let name = path.basename(entry, ext);
+  if (ext === '.svelte') {
+    name = name
+      .split('-')
+      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+      .join('');
+  }
+  return name;
+};
 
 export const processSvelte = async (
   code: string,
@@ -37,10 +49,11 @@ export const processSvelte = async (
 };
 
 export const compileSvelte = async (
-  name: string,
+  entry: string,
   code: string,
   options?: BumbleOptions
 ) => {
+  const name = componentName(entry);
   if (code.includes('lang="ts"')) {
     code = await processSvelte(code, options);
   }

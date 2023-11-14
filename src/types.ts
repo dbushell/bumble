@@ -1,4 +1,5 @@
 import {typescript, svelte} from './deps.ts';
+import Script from './script.ts';
 
 export interface BumbleOptions {
   [key: PropertyKey]: unknown;
@@ -24,7 +25,7 @@ export interface BumbleManifest {
 }
 
 export interface BumbleBundle {
-  code: string;
+  script: Script;
   manifest: BumbleManifest;
 }
 
@@ -53,7 +54,7 @@ export interface CompileProps {
   entry: string;
   options: BumbleOptions;
   manifest: BumbleManifest;
-  imports: Set<string>;
+  compiled: Set<string>;
   external: Array<{
     from: string;
     names: Array<{alias: string; local: string}>;

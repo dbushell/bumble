@@ -1,13 +1,17 @@
-import {parseExports} from './lib/acorn.ts';
 import {svelteMap} from './lib/svelte.ts';
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */
 export const importDynamicBundle = async <M>(
-  bundle: BumbleBundle
+  bundle: BumbleBundle,
+  options?: BumbleOptions
 ): Promise<BumbleModule<M>> => {
-  let {code, manifest} = bundle;
-  // Append import statements
+  const {script, manifest} = bundle;
+  let code = script.getCode({
+    exports: true,
+    filterExports: options?.filterExports
+  });
+  // Append external import statements
   for (const [from, names] of manifest.external.entries()) {
     code = `import {${names.join(',')}} from "npm:${from}";\n${code}`;
   }
@@ -20,9 +24,14 @@ export const importDynamicBundle = async <M>(
 
 /** Evaluate bundle in a function that returns the exports */
 export const importFunctionBundle = async <M>(
-  bundle: BumbleBundle
+  bundle: BumbleBundle,
+  options?: BumbleOptions
 ): Promise<BumbleModule<M>> => {
-  let {code, manifest} = bundle;
+  const {script, manifest} = bundle;
+  let code = script.getCode({
+    exports: false,
+    filterExports: options?.filterExports
+  });
   // Reference imports from global
   window['📦'] = {};
   for (const [from, names] of manifest.external.entries()) {
@@ -33,10 +42,11 @@ export const importFunctionBundle = async <M>(
       });
     }
   }
-  const parsed = parseExports(code);
-  code = parsed.code;
   const values: string[] = [];
-  for (const [alias, name] of parsed.map) {
+  for (const [alias, name] of script.exports) {
+    if (options?.filterExports?.includes(alias) === false) {
+      continue;
+    }
     values.push(`${alias}:${name}`);
   }
   const statement = `return {${values.join(',')}};`;
@@ -46,11 +56,11 @@ export const importFunctionBundle = async <M>(
 
 /** Import module bundle */
 export const importBundle = <M>(
-  options: BumbleOptions,
-  bundle: BumbleBundle
+  bundle: BumbleBundle,
+  options?: BumbleOptions
 ): Promise<BumbleModule<M>> => {
-  if (options.dynamicImports) {
-    return importDynamicBundle<M>(bundle);
+  if (options?.dynamicImports) {
+    return importDynamicBundle<M>(bundle, options);
   }
-  return importFunctionBundle<M>(bundle);
+  return importFunctionBundle<M>(bundle, options);
 };

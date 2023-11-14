@@ -49,6 +49,7 @@ export const parseImports = (
       } else {
         console.warn('Unsupported ImportSpecifier Literal');
       }
+      throw new Error('Unsupported Import');
     }
   }
   return {code, map};
@@ -66,18 +67,23 @@ export const parseExports = (
     if (!node.type.startsWith('Export')) {
       continue;
     }
-    // Remove the entire export statement
-    let removeNode = false;
+    const removeNode = () => {
+      code =
+        code.substring(0, node.start + offset) +
+        code.substring(node.end + offset);
+      offset -= node.end - node.start;
+    };
     // Handle default exports
     if (node.type === 'ExportDefaultDeclaration') {
+      removeNode();
       if (node.declaration.type !== 'Identifier') {
         throw new Error('Unsupported ExportDefaultDeclaration');
       }
       map.set('default', (node.declaration as acorn.Identifier).name);
-      removeNode = true;
+      continue;
     }
     // Handle named exports
-    else if (node.type === 'ExportNamedDeclaration') {
+    if (node.type === 'ExportNamedDeclaration') {
       // Handle declarations
       if (node.declaration) {
         let identifier: acorn.Identifier | undefined;
@@ -101,7 +107,7 @@ export const parseExports = (
       }
       // Handle specifiers
       else if (node.specifiers) {
-        removeNode = true;
+        removeNode();
         for (const specifier of node.specifiers) {
           if (specifier.exported.type !== 'Identifier') {
             console.warn('Unsupported ExportNamedDeclaration');
@@ -115,23 +121,22 @@ export const parseExports = (
           );
         }
       }
+      continue;
     }
     // Handle all exports
-    else if (node.type === 'ExportAllDeclaration') {
-      throw new Error('Export all not supported');
+    if (node.type === 'ExportAllDeclaration') {
+      throw new Error('Unsupported ExportAllDeclaration');
     }
-    // Remove full export statement
-    if (removeNode) {
-      code =
-        code.substring(0, node.start + offset) +
-        code.substring(node.end + offset);
-      offset -= node.end - node.start;
-    }
+    throw new Error('Unsupported Export');
   }
   return {code, map};
 };
 
-export const filterExports = (code: string, allowed: string[]): string => {
+export const filterExports = (
+  code: string,
+  exports: ParseExportMap,
+  allowed: string[]
+): string => {
   const parsed = parseExports(code);
   code = parsed.code;
   const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
@@ -139,7 +144,7 @@ export const filterExports = (code: string, allowed: string[]): string => {
   let offset = 0;
   // Invert export map to lookup local names
   const localMap = new Map<string, string>();
-  parsed.map.forEach((v, k) => localMap.set(v, k));
+  exports.forEach((v, k) => localMap.set(v, k));
   for (const node of ast.body) {
     const locals: string[] = [];
     if (node.type === 'VariableDeclaration') {
@@ -166,14 +171,5 @@ export const filterExports = (code: string, allowed: string[]): string => {
       break;
     }
   }
-  // Append allowed exports in a single statement
-  const parts = [];
-  for (const [alias, name] of parsed.map) {
-    if (!allowed.includes(alias)) {
-      continue;
-    }
-    parts.push(alias === name ? name : `${name} as ${alias}`);
-  }
-  code += `\nexport { ${parts.join(', ')} };\n`;
   return code;
 };
