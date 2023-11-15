@@ -1,4 +1,4 @@
-# 🐝 Svelte Bumble
+# 🐝 Bumble
 
 An experimental just-in-time Svelte + TypeScript module bundler and importer ✨
 

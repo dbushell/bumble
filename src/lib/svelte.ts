@@ -15,35 +15,26 @@ const componentName = (entry: string) => {
 };
 
 export const processSvelte = async (
+  entry: string,
   code: string,
   options?: BumbleOptions
 ): Promise<string> => {
-  const process = await svelte.preprocess(code, {
-    markup: (markup) => {
-      let scripts = '';
-      for (const match of markup.content.matchAll(
-        /<script([^>]*)>(.*?)<\/script>/gis
-      )) {
-        let attr = match[1];
-        // Ignore if not TypeScript
-        if (!attr.includes('lang="ts"')) {
-          scripts += match[0];
-          continue;
+  const group: Array<svelte.PreprocessorGroup> = [
+    {
+      script: (script) => {
+        let code = script.content;
+        if (script.attributes.lang === 'ts') {
+          code = transpileTs(script.content, options?.typescript);
         }
-        // Replace with transpiled code
-        attr = attr.replace('lang="ts"', '');
-        const code = transpileTs(match[2], options?.typescript);
-        scripts += `<script${attr}>\n${code}\n</script>`;
+        return {code};
       }
-      // Strip existing scripts
-      let code = markup.content.replaceAll(
-        /<script([^>]*)>(.*?)<\/script>/gis,
-        ''
-      );
-      // Prepend new script
-      code = `${scripts}\n${code}`;
-      return {code};
     }
+  ];
+  if (options?.sveltePreprocess) {
+    group.push(...[options.sveltePreprocess].flat(2));
+  }
+  const process = await svelte.preprocess(code, group, {
+    filename: entry
   });
   return process.code;
 };
@@ -54,9 +45,7 @@ export const compileSvelte = async (
   options?: BumbleOptions
 ) => {
   const name = componentName(entry);
-  if (code.includes('lang="ts"')) {
-    code = await processSvelte(code, options);
-  }
+  code = await processSvelte(entry, code, options);
   const result = svelte.compile(code, {
     name,
     generate: 'ssr',

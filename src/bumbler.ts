@@ -33,6 +33,10 @@ export class Bumbler<M> {
     );
   }
 
+  set sveltePreprocess(preprocess: BumbleOptions['sveltePreprocess']) {
+    this.#options.sveltePreprocess = preprocess;
+  }
+
   async bumbleDOM(abspath: string, options?: BumbleOptions): Promise<string> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {

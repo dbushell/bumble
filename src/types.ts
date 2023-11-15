@@ -15,12 +15,18 @@ export interface BumbleOptions {
   typescript?: typescript.CompilerOptions;
   /** Svelte compiler options */
   svelte?: svelte.CompileOptions;
+  sveltePreprocess?: svelte.PreprocessorGroup | svelte.PreprocessorGroup[];
+}
+
+export interface BumbleManifestDeps {
+  imports: string[];
+  exports: string[];
 }
 
 export interface BumbleManifest {
   dir: string;
   entry: string;
-  dependencies: Map<string, string[]>;
+  dependencies: Map<string, BumbleManifestDeps>;
   external: Map<string, string[]>;
 }
 

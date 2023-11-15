@@ -1,6 +1,7 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
+import {encodeHash} from './utils.ts';
 import Script from './script.ts';
 import type {
   BumbleOptions,
@@ -24,18 +25,21 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
 
   const start = performance.now();
 
-  const rel = path.relative(dir, entry);
+  const hash = await encodeHash(props.options.deployId + entry, 'SHA-1');
   const ext = path.extname(entry);
 
   if (!dependencies.has(entry)) {
-    dependencies.set(entry, []);
+    dependencies.set(entry, {
+      imports: [],
+      exports: []
+    });
   }
 
   // Check if already compiled
-  if (props.compiled.has(rel)) {
+  if (props.compiled.has(hash)) {
     throw new Error(`Already compiled (${entry})`);
   }
-  props.compiled.add(rel);
+  props.compiled.add(hash);
 
   let code: string;
 
@@ -64,6 +68,8 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
 
   const script = new Script(code, entry, dir);
 
+  dependencies.get(entry)!.exports.push(...script.exports.keys());
+
   for (const [from, names] of script.externalImports) {
     props.external.push({from, names});
   }
@@ -71,23 +77,26 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
   const prepend = [];
 
   for (const [newEntry, names] of script.localImports) {
-    const newRel = path.relative(dir, newEntry);
-    dependencies.get(entry)?.push(newEntry);
-    if (props.compiled.has(newRel)) {
+    const newHash = await encodeHash(
+      props.options.deployId + newEntry,
+      'SHA-1'
+    );
+    dependencies.get(entry)?.imports.push(newEntry);
+    if (props.compiled.has(newHash)) {
       for (const {local, alias} of names) {
-        script.prepend(`const ${local} = $$$.get('${newRel}').${alias};`);
+        script.prepend(`const ${local} = $$$.get('${newHash}').${alias};`);
       }
       continue;
     }
     const newScript = await compile({...props, entry: newEntry}, depth + 1);
     for (const [alias, name] of newScript.exports) {
       newScript.append(
-        `{ let K = '${newRel}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }`
+        `{ let K = '${newHash}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }`
       );
     }
-    prepend.push(`/* ${newRel} */\n{\n${newScript.getCode()}\n}\n`);
+    prepend.push(`\n{\n${newScript.getCode()}\n}\n`);
     script.prepend(
-      `const ${names[0].local} = $$$.get('${newRel}').${names[0].alias};`
+      `const ${names[0].local} = $$$.get('${newHash}').${names[0].alias};`
     );
   }
 
@@ -98,7 +107,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
 
   if (props.options?.dev) {
     const time = (performance.now() - start).toFixed(2);
-    console.log(`🥢 ${time}ms (${rel})`);
+    console.log(`🥢 ${time}ms (${path.relative(dir, entry)})`);
   }
 
   return script;
