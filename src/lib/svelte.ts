@@ -61,15 +61,13 @@ export const compileSvelte = async (
 
 // Needed for Deno Deploy limitations
 export const svelteMap: Record<string, () => Promise<unknown>> = {
-  svelte: () => import('npm:svelte@4.2.2'),
-  'svelte/action': () => import('npm:svelte@4.2.2/action'),
-  'svelte/animate': () => import('npm:svelte@4.2.2/animate'),
-  'svelte/easing': () => import('npm:svelte@4.2.2/easing'),
-  'svelte/elements': () => import('npm:svelte@4.2.2/elements'),
-  'svelte/motion': () => import('npm:svelte@4.2.2/motion'),
-  'svelte/store': () => import('npm:svelte@4.2.2/store'),
-  'svelte/transition': () => import('npm:svelte@4.2.2/transition'),
-  'svelte/internal': () => import('npm:svelte@4.2.2/internal'),
+  svelte: () => import('npm:svelte@4.2.3'),
+  'svelte/animate': () => import('npm:svelte@4.2.3/animate'),
+  'svelte/easing': () => import('npm:svelte@4.2.3/easing'),
+  'svelte/motion': () => import('npm:svelte@4.2.3/motion'),
+  'svelte/store': () => import('npm:svelte@4.2.3/store'),
+  'svelte/transition': () => import('npm:svelte@4.2.3/transition'),
+  'svelte/internal': () => import('npm:svelte@4.2.3/internal'),
   'svelte/internal/disclose-version': () =>
-    import('npm:svelte@4.2.2/internal/disclose-version')
+    import('npm:svelte@4.2.3/internal/disclose-version')
 };
