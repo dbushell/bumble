@@ -50,7 +50,17 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
   if (codeCache.has(cacheKey)) {
     code = codeCache.get(cacheKey)!;
   } else {
-    code = await Deno.readTextFile(entry);
+    if (/^(file|https:)/.test(entry)) {
+      try {
+        const response = await fetch(entry);
+        code = await response.text();
+      } catch (err) {
+        console.log(err);
+        throw new Error(`Failed to fetch (${entry})`);
+      }
+    } else {
+      code = await Deno.readTextFile(entry);
+    }
     // Convert formats to JavaScript
     if (ext === '.svelte') {
       code = await compileSvelte(entry, code, props.options);
