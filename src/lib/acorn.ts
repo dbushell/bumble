@@ -1,10 +1,15 @@
 import {acorn} from '../deps.ts';
 import type {ParseExportMap, ParseImportMap} from '../types.ts';
 
+const parse = (code: string) => {
+  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  return ast;
+};
+
 export const parseImports = (
   code: string
 ): {code: string; map: ParseImportMap} => {
-  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const ast = parse(code);
   const map: ParseImportMap = new Map();
   // Negative offset to track removed code
   let offset = 0;
@@ -58,7 +63,7 @@ export const parseImports = (
 export const parseExports = (
   code: string
 ): {code: string; map: ParseExportMap} => {
-  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const ast = parse(code);
   const map: ParseExportMap = new Map();
   // Negative offset to track removed code
   let offset = 0;
@@ -139,7 +144,7 @@ export const filterExports = (
 ): string => {
   const parsed = parseExports(code);
   code = parsed.code;
-  const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  const ast = parse(code);
   // Negative offset to track removed code
   let offset = 0;
   // Invert export map to lookup local names
