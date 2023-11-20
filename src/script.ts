@@ -78,7 +78,7 @@ export default class Script {
   getExport(allowed?: CodeOptions['filterExports']) {
     const parts = [];
     for (const [alias, name] of this.#exports) {
-      if (!allowed?.includes(alias)) continue;
+      if (allowed?.includes(alias) === false) continue;
       parts.push(alias === name ? name : `${name} as ${alias}`);
     }
     return `export { ${parts.join(', ')} };`;
