@@ -1,6 +1,5 @@
 import {path, svelte} from '../deps.ts';
 import {transpileTs} from './typescript.ts';
-import Script from '../script.ts';
 import type {BumbleOptions} from '../types.ts';
 
 const componentName = (entry: string) => {
@@ -17,7 +16,7 @@ const componentName = (entry: string) => {
 
 export const processSvelte = async (
   entry: string,
-  code: string,
+  entryCode: string,
   options?: BumbleOptions
 ): Promise<string> => {
   const group: Array<svelte.PreprocessorGroup> = [
@@ -27,23 +26,19 @@ export const processSvelte = async (
         if (params.attributes.lang === 'ts') {
           code = transpileTs(params.content, options?.typescript);
         }
-        if (
-          options?.svelte?.generate === 'dom' &&
-          params.attributes.context === 'module'
-        ) {
-          // TODO: allow builtin components? (e.g. island)
-          const script = new Script(code, entry, path.dirname(entry));
-          return {code: script.getCode({exports: true})};
-        }
         return {code};
       }
     }
   ];
-  // TODO: use generator function to pass options back
-  if (options?.sveltePreprocess) {
-    group.push(...[options.sveltePreprocess].flat(2));
+  // Pass through additional groups
+  let preprocess = options?.sveltePreprocess;
+  if (preprocess) {
+    if (typeof preprocess === 'function') {
+      preprocess = preprocess(entry, options);
+    }
+    group.push(...[preprocess].flat(2));
   }
-  const process = await svelte.preprocess(code, group, {
+  const process = await svelte.preprocess(entryCode, group, {
     filename: entry
   });
   return process.code;

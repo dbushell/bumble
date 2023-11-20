@@ -1,6 +1,8 @@
 import {typescript, svelte} from './deps.ts';
 import Script from './script.ts';
 
+type SveltePreprocess = svelte.PreprocessorGroup | svelte.PreprocessorGroup[];
+
 export interface BumbleOptions {
   [key: PropertyKey]: unknown;
   /** Debug output */
@@ -15,7 +17,9 @@ export interface BumbleOptions {
   typescript?: typescript.CompilerOptions;
   /** Svelte compiler options */
   svelte?: svelte.CompileOptions;
-  sveltePreprocess?: svelte.PreprocessorGroup | svelte.PreprocessorGroup[];
+  sveltePreprocess?:
+    | SveltePreprocess
+    | ((entry: string, options?: BumbleOptions) => SveltePreprocess);
 }
 
 export interface BumbleManifestDeps {
