@@ -35,10 +35,6 @@ export class Bumbler<M> {
     return this.#options.deployHash ?? 'bumble';
   }
 
-  set sveltePreprocess(preprocess: BumbleOptions['sveltePreprocess']) {
-    this.#options.sveltePreprocess = preprocess;
-  }
-
   async start() {
     if (!this.#options.build) {
       return;
