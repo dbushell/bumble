@@ -1,6 +1,7 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
+import {minify} from './esbuild/mod.ts';
 import {encodeHash} from './utils.ts';
 import Script from './script.ts';
 import type {
@@ -143,8 +144,10 @@ export const bundleModule = async (
     external: [],
     compiled: new Set()
   };
+
   // Compile from main entry
-  const script = await compile(props);
+  let script = await compile(props);
+
   // Reduce external imports to remove duplicates
   for (const {from, names} of props.external!) {
     if (!from.startsWith('svelte')) {
@@ -157,6 +160,12 @@ export const bundleModule = async (
       ])
     ]);
   }
+
+  if (options.svelte?.generate === 'dom') {
+    script = await minify(dir, entry, script, manifest, options);
+    manifest.external.clear();
+  }
+
   if (options?.dev) {
     const time = (performance.now() - start).toFixed(2);
     console.log(`🥡 ${time}ms (${path.relative(dir, entry)})`);

@@ -1,4 +1,4 @@
-import {svelteMap} from './lib/svelte.ts';
+import {svelteNpmMap} from './lib/svelte.ts';
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */
@@ -35,8 +35,8 @@ export const importFunctionBundle = async <M>(
   // Reference imports from global
   window['📦'] = {};
   for (const [from, names] of manifest.external.entries()) {
-    if (Object.hasOwn(svelteMap, from)) {
-      window['📦'][from] = await svelteMap[from]();
+    if (Object.hasOwn(svelteNpmMap, from)) {
+      window['📦'][from] = await svelteNpmMap[from]();
       names.forEach((name) => {
         code = `const {${name}} = window['📦']['${from}'];\n${code}`;
       });

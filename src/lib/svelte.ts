@@ -2,7 +2,39 @@ import {path, svelte} from '../deps.ts';
 import {transpileTs} from './typescript.ts';
 import type {BumbleOptions} from '../types.ts';
 
-const componentName = (entry: string) => {
+const sveltePath = (rel: string) => {
+  return new URL(rel, import.meta.url).pathname;
+};
+
+export const svelteLocalMap = {
+  svelte: sveltePath('../svelte@4.2.7/runtime/index.js'),
+  'svelte/animate': sveltePath('../svelte@4.2.7/runtime/animate/index.js'),
+  'svelte/easing': sveltePath('../svelte@4.2.7/runtime/easing/index.js'),
+  'svelte/motion': sveltePath('../svelte@4.2.7/runtime/motion/index.js'),
+  'svelte/store': sveltePath('../svelte@4.2.7/runtime/store/index.js'),
+  'svelte/transition': sveltePath(
+    '../svelte@4.2.7/runtime/transition/index.js'
+  ),
+  'svelte/internal': sveltePath('../svelte@4.2.7/runtime/internal/index.js'),
+  'svelte/internal/disclose-version': sveltePath(
+    '../svelte@4.2.7/runtime/internal/disclose-version/index.js'
+  )
+};
+
+// Needed for Deno Deploy limitations
+export const svelteNpmMap: Record<string, () => Promise<unknown>> = {
+  svelte: () => import('npm:svelte@4.2.3'),
+  'svelte/animate': () => import('npm:svelte@4.2.3/animate'),
+  'svelte/easing': () => import('npm:svelte@4.2.3/easing'),
+  'svelte/motion': () => import('npm:svelte@4.2.3/motion'),
+  'svelte/store': () => import('npm:svelte@4.2.3/store'),
+  'svelte/transition': () => import('npm:svelte@4.2.3/transition'),
+  'svelte/internal': () => import('npm:svelte@4.2.3/internal'),
+  'svelte/internal/disclose-version': () =>
+    import('npm:svelte@4.2.3/internal/disclose-version')
+};
+
+export const componentName = (entry: string) => {
   const ext = path.extname(entry);
   let name = path.basename(entry, ext);
   if (ext === '.svelte') {
@@ -62,17 +94,4 @@ export const compileSvelte = async (
     ...options?.svelte
   });
   return result.js.code;
-};
-
-// Needed for Deno Deploy limitations
-export const svelteMap: Record<string, () => Promise<unknown>> = {
-  svelte: () => import('npm:svelte@4.2.3'),
-  'svelte/animate': () => import('npm:svelte@4.2.3/animate'),
-  'svelte/easing': () => import('npm:svelte@4.2.3/easing'),
-  'svelte/motion': () => import('npm:svelte@4.2.3/motion'),
-  'svelte/store': () => import('npm:svelte@4.2.3/store'),
-  'svelte/transition': () => import('npm:svelte@4.2.3/transition'),
-  'svelte/internal': () => import('npm:svelte@4.2.3/internal'),
-  'svelte/internal/disclose-version': () =>
-    import('npm:svelte@4.2.3/internal/disclose-version')
 };

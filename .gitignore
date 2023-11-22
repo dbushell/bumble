@@ -4,7 +4,3 @@
 !README.md
 !mod.ts
 !src
-src/*
-!src/lib
-src/lib/*
-!src/**/*.ts
