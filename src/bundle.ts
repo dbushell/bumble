@@ -1,7 +1,7 @@
 import {path} from './deps.ts';
 import {compileSvelte} from './lib/svelte.ts';
 import {transpileTs} from './lib/typescript.ts';
-import {minify} from './esbuild/mod.ts';
+import {minify} from './esbuild/minify.ts';
 import {encodeHash} from './utils.ts';
 import Script from './script.ts';
 import type {

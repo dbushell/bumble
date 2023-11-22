@@ -1,11 +1,11 @@
-// @deno-types="https://deno.land/x/esbuild@v0.19.6/mod.d.ts"
-import esbuild from './mod.ts';
+import {esbuildStart} from './mod.ts';
 import {path} from '../deps.ts';
 import Script from '../script.ts';
-import type {BumbleOptions, BumbleManifest} from '../types.ts';
 import {svelteLocalMap} from '../lib/svelte.ts';
+import type {BumbleOptions, BumbleManifest} from '../types.ts';
+import type {esbuildType} from './mod.ts';
 
-export const sveltePlugin: esbuild.Plugin = {
+export const sveltePlugin: esbuildType.Plugin = {
   name: 'svelte',
   setup(build) {
     build.onResolve({filter: /.*/}, (args) => {
@@ -62,6 +62,7 @@ export const minify = async (
   for (const [from, names] of manifest.external.entries()) {
     code = `import {${names.join(',')}} from "${from}";\n${code}`;
   }
+  const esbuild = await esbuildStart();
   const bundle = await esbuild.build({
     stdin: {
       contents: code

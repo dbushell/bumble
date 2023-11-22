@@ -20,6 +20,7 @@ export interface BumbleOptions {
   sveltePreprocess?:
     | SveltePreprocess
     | ((entry: string, options?: BumbleOptions) => SveltePreprocess);
+  build?: boolean;
 }
 
 export interface BumbleManifestDeps {

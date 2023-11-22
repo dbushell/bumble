@@ -1,3 +1,4 @@
+export * as fs from 'https://deno.land/std@0.207.0/fs/mod.ts';
 export * as path from 'https://deno.land/std@0.207.0/path/mod.ts';
 export * as hex from 'https://deno.land/std@0.207.0/encoding/hex.ts';
 export {deepMerge} from 'https://deno.land/std@0.207.0/collections/mod.ts';

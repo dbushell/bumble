@@ -10,6 +10,16 @@ interface CodeOptions {
   filterExports?: BumbleOptions['filterExports'];
 }
 
+export interface SerializedScript {
+  code: string;
+  entry: string;
+  dir: string;
+  prefix: string[];
+  suffix: string[];
+  imports: ParseImportMap;
+  exports: ParseExportMap;
+}
+
 export default class Script {
   #code: string;
   #entry: string;
@@ -19,12 +29,41 @@ export default class Script {
   #imports: ParseImportMap;
   #exports: ParseExportMap;
 
-  constructor(code: string, entry: string, dir: string) {
+  constructor(
+    code: string,
+    entry: string,
+    dir: string,
+    serialized?: SerializedScript
+  ) {
     this.#code = code;
     this.#entry = entry;
     this.#dir = dir;
+    if (serialized) {
+      this.#prefix = serialized.prefix;
+      this.#suffix = serialized.suffix;
+      this.#imports = serialized.imports;
+      this.#exports = serialized.exports;
+      return;
+    }
     ({code: this.#code, map: this.#imports} = parseImports(this.#code));
     ({code: this.#code, map: this.#exports} = parseExports(this.#code));
+  }
+
+  serialize() {
+    return {
+      code: this.#code,
+      entry: this.#entry,
+      dir: this.#dir,
+      prefix: this.#prefix,
+      suffix: this.#suffix,
+      imports: this.#imports,
+      exports: this.#exports
+    };
+  }
+
+  static deserialize(serialized: SerializedScript) {
+    const {code, entry, dir} = serialized;
+    return new Script(code, entry, dir, serialized);
   }
 
   get imports() {
