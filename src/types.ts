@@ -7,8 +7,8 @@ export interface BumbleOptions {
   [key: PropertyKey]: unknown;
   /** Debug output */
   dev?: boolean;
-  /** Used to cache compiled routes (will be hashed) */
-  deployId?: string;
+  /** Used to cache compiled routes */
+  deployHash?: string;
   /** Dynamic imports are faster and safer */
   dynamicImports?: boolean;
   /** Exclusive list of top-level bundle exports */

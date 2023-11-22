@@ -31,12 +31,8 @@ export class Bumbler<M> {
     return this.#options.dev ?? false;
   }
 
-  get deployHash(): Promise<string | undefined> {
-    return Promise.resolve(
-      this.#options.deployId
-        ? encodeHash(this.#options.deployId, 'SHA-1')
-        : undefined
-    );
+  get deployHash(): string {
+    return this.#options.deployHash ?? 'bumble';
   }
 
   set sveltePreprocess(preprocess: BumbleOptions['sveltePreprocess']) {
@@ -47,11 +43,10 @@ export class Bumbler<M> {
     if (!this.#options.build) {
       return;
     }
-    const hash = (await this.deployHash) ?? '';
     const cache = path.join(Deno.cwd(), '.dinossr');
     await fs.ensureDir(cache);
     for await (const dir of Deno.readDir(cache)) {
-      if (dir.isDirectory && dir.name !== hash) {
+      if (dir.isDirectory && dir.name !== this.deployHash) {
         await Deno.remove(path.join(cache, dir.name), {recursive: true});
       }
     }
@@ -67,7 +62,7 @@ export class Bumbler<M> {
     const cachePath = path.join(
       Deno.cwd(),
       '.dinossr',
-      (await this.deployHash)!,
+      this.deployHash,
       `${await encodeHash(entry, 'SHA-1')}-${suffix}.json`
     );
     if (await fs.exists(cachePath)) {
@@ -85,7 +80,6 @@ export class Bumbler<M> {
   async bumbleDOM(entry: string, options?: BumbleOptions): Promise<string> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
-      deployId: await this.deployHash,
       svelte: {
         generate: 'dom'
       }
@@ -114,7 +108,6 @@ export class Bumbler<M> {
   ): Promise<{manifest: BumbleManifest; mod: BumbleModule<M>}> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
-      deployId: await this.deployHash,
       svelte: {
         generate: 'ssr'
       }

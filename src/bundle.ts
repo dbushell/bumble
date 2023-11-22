@@ -26,7 +26,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
 
   const start = performance.now();
 
-  const hash = await encodeHash(props.options.deployId + entry, 'SHA-1');
+  const hash = await encodeHash(props.options.deployHash + entry, 'SHA-1');
   const ext = path.extname(entry);
 
   if (!dependencies.has(entry)) {
@@ -89,7 +89,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
 
   for (const [newEntry, names] of script.localImports) {
     const newHash = await encodeHash(
-      props.options.deployId + newEntry,
+      props.options.deployHash + newEntry,
       'SHA-1'
     );
     dependencies.get(entry)?.imports.push(newEntry);
