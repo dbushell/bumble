@@ -11,21 +11,34 @@ export const sveltePlugin: esbuild.Plugin = {
     build.onResolve({filter: /.*/}, (args) => {
       if (args.path.startsWith('svelte')) {
         if (Object.hasOwn(svelteLocalMap, args.path)) {
-          const url = import.meta.resolve(
-            svelteLocalMap[args.path as keyof typeof svelteLocalMap]
-          );
-          return {path: new URL(url).pathname};
+          return {
+            path: svelteLocalMap[args.path as keyof typeof svelteLocalMap],
+            namespace: 'fetch'
+          };
         }
       }
       if (args.path.startsWith('.')) {
-        return {path: path.resolve(args.resolveDir, args.path)};
+        if (args.namespace === 'fetch') {
+          return {
+            path: new URL(args.path, args.importer).href,
+            namespace: 'fetch'
+          };
+        } else {
+          return {path: path.resolve(args.resolveDir, args.path)};
+        }
       }
       return {path: args.path};
     });
     build.onLoad({filter: /\.js$/}, async (args) => {
-      const src = await Deno.readTextFile(args.path);
+      let contents = '';
+      if (args.namespace === 'fetch') {
+        const response = await fetch(args.path);
+        contents = await response.text();
+      } else {
+        contents = await Deno.readTextFile(args.path);
+      }
       return {
-        contents: src,
+        contents,
         loader: 'js'
       };
     });
@@ -62,7 +75,6 @@ export const minify = async (
     minifyIdentifiers: true,
     write: false
   });
-  esbuild.stop();
   script = new Script(bundle.outputFiles[0].text, entry, dir);
   minifyCache.set(entry, script);
   if (options?.dev) {

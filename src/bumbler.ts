@@ -2,6 +2,7 @@ import {path, deepMerge} from './deps.ts';
 import {bundleModule} from './bundle.ts';
 import {importBundle} from './module.ts';
 import {compilerOptions} from './lib/typescript.ts';
+import {esbuildStop} from './esbuild/mod.ts';
 import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleManifest, BumbleModule} from './types.ts';
 
@@ -35,6 +36,10 @@ export class Bumbler<M> {
 
   set sveltePreprocess(preprocess: BumbleOptions['sveltePreprocess']) {
     this.#options.sveltePreprocess = preprocess;
+  }
+
+  stop(): void {
+    esbuildStop();
   }
 
   async bumbleDOM(abspath: string, options?: BumbleOptions): Promise<string> {

@@ -2,9 +2,7 @@ import {path, svelte} from '../deps.ts';
 import {transpileTs} from './typescript.ts';
 import type {BumbleOptions} from '../types.ts';
 
-const sveltePath = (rel: string) => {
-  return new URL(rel, import.meta.url).pathname;
-};
+const sveltePath = (rel: string) => new URL(import.meta.resolve(rel)).href;
 
 export const svelteLocalMap = {
   svelte: sveltePath('../svelte@4.2.7/runtime/index.js'),
