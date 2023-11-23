@@ -51,7 +51,7 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
   if (codeCache.has(cacheKey)) {
     code = codeCache.get(cacheKey)!;
   } else {
-    if (/^(file|https:)/.test(entry)) {
+    if (/^(file|https):/.test(entry)) {
       try {
         const response = await fetch(entry);
         code = await response.text();
@@ -100,15 +100,17 @@ const compile = async (props: CompileProps, depth = 0): Promise<Script> => {
       continue;
     }
     const newScript = await compile({...props, entry: newEntry}, depth + 1);
+    newScript.append('{');
+    newScript.append(`  let K = '${newHash}';`);
+    newScript.append(`  $$$.set(K, $$$.get(K) ?? {});`);
     for (const [alias, name] of newScript.exports) {
-      newScript.append(
-        `{ let K = '${newHash}'; $$$.set(K, {...$$$.get(K) ?? {}, ${alias}: ${name}}); }`
-      );
+      newScript.append(`  $$$.set(K, {...$$$.get(K), ${alias}: ${name}});`);
     }
+    newScript.append('}');
     prepend.push(`\n{\n${newScript.getCode()}\n}\n`);
-    script.prepend(
-      `const ${names[0].local} = $$$.get('${newHash}').${names[0].alias};`
-    );
+    for (const {local, alias} of names) {
+      script.prepend(`const ${local} = $$$.get('${newHash}').${alias};`);
+    }
   }
 
   script.prepend(prepend.join('\n'));

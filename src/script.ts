@@ -80,7 +80,7 @@ export default class Script {
       if (from.startsWith('@')) {
         from = path.resolve(this.#dir, from.slice(1));
       }
-      if (/^(file|https:)/.test(from)) {
+      if (/^(file|https):/.test(from)) {
         map.set(from, names);
         continue;
       }
@@ -95,7 +95,7 @@ export default class Script {
   get externalImports() {
     const map: ParseImportMap = new Map();
     for (const [from, names] of this.#imports) {
-      if (/^(file|https:)/.test(from)) {
+      if (/^(file|https):/.test(from)) {
         continue;
       }
       if (/^(\.|\/|@)/.test(from)) {

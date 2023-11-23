@@ -29,7 +29,7 @@ export const sveltePlugin: esbuildType.Plugin = {
       }
       return {path: args.path};
     });
-    build.onLoad({filter: /^(https|file):/}, async (args) => {
+    build.onLoad({filter: /^(file|https):/}, async (args) => {
       const response = await fetch(args.path);
       const contents = await response.text();
       return {
