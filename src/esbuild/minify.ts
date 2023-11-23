@@ -1,7 +1,6 @@
 import {esbuildStart} from './mod.ts';
 import {path} from '../deps.ts';
 import Script from '../script.ts';
-import {svelteLocalMap} from '../lib/svelte.ts';
 import type {BumbleOptions, BumbleManifest} from '../types.ts';
 import type {esbuildType} from './mod.ts';
 
@@ -10,33 +9,36 @@ export const sveltePlugin: esbuildType.Plugin = {
   setup(build) {
     build.onResolve({filter: /.*/}, (args) => {
       if (args.path.startsWith('svelte')) {
-        if (Object.hasOwn(svelteLocalMap, args.path)) {
-          return {
-            path: svelteLocalMap[args.path as keyof typeof svelteLocalMap],
-            namespace: 'fetch'
-          };
-        }
+        const href = `https://esm.sh/${args.path.replace(
+          'svelte',
+          'svelte@4.2.7'
+        )}?target=esnext`;
+        return {
+          path: href,
+          namespace: 'fetch'
+        };
+      }
+      if (args.namespace === 'fetch') {
+        return {
+          path: new URL(args.path, args.importer).href,
+          namespace: 'fetch'
+        };
       }
       if (args.path.startsWith('.')) {
-        if (args.namespace === 'fetch') {
-          return {
-            path: new URL(args.path, args.importer).href,
-            namespace: 'fetch'
-          };
-        } else {
-          return {path: path.resolve(args.resolveDir, args.path)};
-        }
+        return {path: path.resolve(args.resolveDir, args.path)};
       }
       return {path: args.path};
     });
+    build.onLoad({filter: /^(https|file):/}, async (args) => {
+      const response = await fetch(args.path);
+      const contents = await response.text();
+      return {
+        contents,
+        loader: 'js'
+      };
+    });
     build.onLoad({filter: /\.js$/}, async (args) => {
-      let contents = '';
-      if (args.namespace === 'fetch') {
-        const response = await fetch(args.path);
-        contents = await response.text();
-      } else {
-        contents = await Deno.readTextFile(args.path);
-      }
+      const contents = await Deno.readTextFile(args.path);
       return {
         contents,
         loader: 'js'
