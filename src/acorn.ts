@@ -1,5 +1,5 @@
-import {acorn} from '../deps.ts';
-import type {ParseExportMap, ParseImportMap} from '../types.ts';
+import {acorn} from './deps.ts';
+import type {ParseExportMap, ParseImportMap} from './types.ts';
 
 const parse = (code: string) => {
   const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});

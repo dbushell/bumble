@@ -1,4 +1,3 @@
-import {svelteNpmMap} from './lib/svelte.ts';
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */
@@ -6,15 +5,11 @@ export const importDynamicBundle = async <M>(
   bundle: BumbleBundle,
   options?: BumbleOptions
 ): Promise<BumbleModule<M>> => {
-  const {script, manifest} = bundle;
-  let code = script.getCode({
+  const {script} = bundle;
+  const code = script.getCode({
     exports: true,
     filterExports: options?.filterExports
   });
-  // Append external import statements
-  for (const [from, names] of manifest.external.entries()) {
-    code = `import {${names.join(',')}} from "npm:${from}";\n${code}`;
-  }
   const blob = new Blob([code], {type: 'text/javascript'});
   const url = URL.createObjectURL(blob);
   const mod = await import(url);
@@ -23,25 +18,15 @@ export const importDynamicBundle = async <M>(
 };
 
 /** Evaluate bundle in a function that returns the exports */
-export const importFunctionBundle = async <M>(
+export const importFunctionBundle = <M>(
   bundle: BumbleBundle,
   options?: BumbleOptions
 ): Promise<BumbleModule<M>> => {
-  const {script, manifest} = bundle;
+  const {script} = bundle;
   let code = script.getCode({
     exports: false,
     filterExports: options?.filterExports
   });
-  // Reference imports from global
-  window['📦'] = {};
-  for (const [from, names] of manifest.external.entries()) {
-    if (Object.hasOwn(svelteNpmMap, from)) {
-      window['📦'][from] = await svelteNpmMap[from]();
-      names.forEach((name) => {
-        code = `const {${name}} = window['📦']['${from}'];\n${code}`;
-      });
-    }
-  }
   const values: string[] = [];
   for (const [alias, name] of script.exports) {
     if (options?.filterExports?.includes(alias) === false) {

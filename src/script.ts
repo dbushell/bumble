@@ -1,5 +1,5 @@
 import {path} from './deps.ts';
-import {parseExports, parseImports, filterExports} from './lib/acorn.ts';
+import {parseExports, parseImports, filterExports} from './acorn.ts';
 import type {BumbleOptions, ParseExportMap, ParseImportMap} from './types.ts';
 
 const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];
