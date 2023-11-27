@@ -51,10 +51,11 @@ const normalizeKey = (dir: string, key: string) => {
   if (!newKey.startsWith(dir)) {
     newKey = path.resolve(Deno.cwd(), `${key}`);
   }
+  newKey = path.relative(dir, newKey);
   return newKey;
 };
 
-// Resolve all metafile paths to absolute paths
+// Resolve all metafile paths to relative paths
 // esbuild WASM resolves differently
 const normalizeMeta = (dir: string, oldMeta: EsbuildMetafile) => {
   const newMeta: EsbuildMetafile = {inputs: {}, outputs: {}};
@@ -151,9 +152,6 @@ export const esbuildBundle = async (
             namespace: 'fetch'
           };
         }
-        if (args.path.startsWith('@')) {
-          return {path: path.resolve(dir, args.path.slice(1))};
-        }
         if (args.path.startsWith('svelte')) {
           const href = `https://esm.sh/${args.path.replace(
             'svelte',
@@ -170,10 +168,16 @@ export const esbuildBundle = async (
             namespace: 'fetch'
           };
         }
+        if (args.path.startsWith('@')) {
+          return {path: path.resolve(dir, args.path.slice(1))};
+        }
+        if (args.path.startsWith('/')) {
+          return {path: args.path};
+        }
         if (args.path.startsWith('.')) {
           return {path: path.resolve(args.resolveDir, args.path)};
         }
-        return {path: args.path};
+        return {path: path.join(dir, args.path)};
       });
       build.onLoad({filter: /^(file|https):/}, async (args) => {
         const key = `fetch:${args.path}`;
