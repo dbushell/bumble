@@ -1,4 +1,4 @@
-import {path, svelte, deepMerge} from './deps.ts';
+import {path, svelte} from './deps.ts';
 import Script from './script.ts';
 import type {Deferred, BumbleOptions, EsbuildMetafile} from './types.ts';
 import * as esbuildType from 'https://deno.land/x/esbuild@v0.19.6/mod.d.ts';
@@ -61,14 +61,14 @@ const normalizeMeta = (dir: string, oldMeta: EsbuildMetafile) => {
   const newMeta: EsbuildMetafile = {inputs: {}, outputs: {}};
   if (Object.hasOwn(newMeta, 'inputs')) {
     for (const [k, input] of Object.entries(oldMeta.inputs)) {
-      const newInput = deepMerge({}, input);
+      const newInput = structuredClone(input);
       newMeta.inputs[normalizeKey(dir, k)] = newInput;
       for (const v2 of newInput.imports) {
         v2.path = normalizeKey(dir, v2.path);
       }
     }
     for (const [k, output] of Object.entries(oldMeta.outputs)) {
-      const newOutput = deepMerge({}, output);
+      const newOutput = structuredClone(output);
       newMeta.outputs[k] = newOutput;
       if (newOutput.entryPoint) {
         newOutput.entryPoint = normalizeKey(dir, newOutput.entryPoint);
