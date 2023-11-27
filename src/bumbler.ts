@@ -44,22 +44,22 @@ export class Bumbler<M> {
     esbuildStop();
   }
 
-  async #bumble(entry: string, options: BumbleOptions): Promise<BumbleBundle> {
+  async #bumble(
+    entry: string,
+    hash: string,
+    options: BumbleOptions
+  ): Promise<BumbleBundle> {
     let bundle: BumbleBundle;
-    const suffix = options.svelteCompile?.generate ?? '';
-    const cachePath = path.join(
-      Deno.cwd(),
-      '.dinossr',
-      this.deployHash,
-      `${await encodeHash(entry, 'SHA-1')}-${suffix}.json`
-    );
-    if (await fs.exists(cachePath)) {
-      bundle = deserialize(await Deno.readTextFile(cachePath));
+    let cache = path.join(Deno.cwd(), '.dinossr', this.deployHash);
+    cache = path.join(cache, `${hash}.json`);
+    if (await fs.exists(cache)) {
+      bundle = deserialize(await Deno.readTextFile(cache));
+      bundle.prebuild = true;
     } else {
       bundle = await esbuildBundle(this.#dir, entry, options);
       if (options.build) {
-        await fs.ensureFile(cachePath);
-        await Deno.writeTextFile(cachePath, serialize(bundle));
+        await fs.ensureFile(cache);
+        await Deno.writeTextFile(cache, serialize(bundle));
       }
     }
     return bundle;
@@ -72,14 +72,15 @@ export class Bumbler<M> {
         generate: 'dom'
       }
     });
+    const rel = path.relative(this.#dir, entry) + '-dom';
+    const hash = await encodeHash(rel, 'SHA-1');
     const s1 = performance.now();
-    const bundle = await this.#bumble(entry, options);
+    const bundle = await this.#bumble(entry, hash, options);
     const code = bundle.script.getCode({
       exports: true,
       filterExports: options?.filterExports
     });
     if (options.dev) {
-      const rel = path.relative(this.#dir, entry);
       const t1 = (performance.now() - s1).toFixed(2);
       console.log(`🐝 ${t1}ms (${rel})`);
     }
@@ -99,16 +100,21 @@ export class Bumbler<M> {
         generate: 'ssr'
       }
     });
+    const rel = path.relative(this.#dir, entry) + '-ssr';
+    const hash = await encodeHash(rel, 'SHA-1');
     const s1 = performance.now();
-    const bundle = await this.#bumble(entry, options);
+    const bundle = await this.#bumble(entry, hash, options);
     const s2 = performance.now();
     const mod = await importBundle<M>(bundle, options);
     if (options.dev) {
-      const rel = path.relative(this.#dir, entry);
       const t2 = (performance.now() - s2).toFixed(2);
-      console.log(`📦 ${t2}ms (${rel})`);
       const t1 = (performance.now() - s1).toFixed(2);
-      console.log(`🐝 ${t1}ms (${rel})`);
+      if (bundle.prebuild) {
+        console.log(`🐝 ${t1}ms (${rel})`);
+      } else {
+        console.log(`📦 ${t2}ms (${rel})`);
+        console.log(`🐝 ${t1}ms (${rel})`);
+      }
     }
     return {mod, metafile: bundle.metafile};
   }

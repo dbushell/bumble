@@ -44,6 +44,7 @@ export interface BumbleOptions {
 export interface BumbleBundle {
   script: Script;
   metafile: esbuildType.Metafile;
+  prebuild?: boolean;
 }
 
 // Partial of `create_ssr_component` return type:
