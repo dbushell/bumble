@@ -1,7 +1,24 @@
-import {typescript, svelte} from './deps.ts';
+import {svelte} from './deps.ts';
 import Script from './script.ts';
+import type {esbuildType} from './esbuild.ts';
 
-type SveltePreprocess = svelte.PreprocessorGroup | svelte.PreprocessorGroup[];
+export type Deferred<T> = ReturnType<typeof Promise.withResolvers<T>>;
+
+export type SveltePreprocess =
+  | svelte.PreprocessorGroup
+  | svelte.PreprocessorGroup[];
+
+export type EsbuildResolve =
+  | null
+  | void
+  | undefined
+  | esbuildType.OnResolveResult
+  | Promise<EsbuildResolve>;
+
+export type EsbuildMetafile = Exclude<
+  esbuildType.BuildResult['metafile'],
+  undefined
+>;
 
 export interface BumbleOptions {
   [key: PropertyKey]: unknown;
@@ -11,33 +28,22 @@ export interface BumbleOptions {
   deployHash?: string;
   /** Dynamic imports are faster and safer */
   dynamicImports?: boolean;
+  /** Generate pre-built bundles */
+  build?: boolean;
   /** Exclusive list of top-level bundle exports */
   filterExports?: string[];
-  /** TypeScript compiler options */
-  typescript?: typescript.CompilerOptions;
-  /** Svelte compiler options */
-  svelte?: svelte.CompileOptions;
+  /** Svelte compiler options: https://svelte.dev/docs/svelte-compiler#types-compileoptions */
+  svelteCompile?: svelte.CompileOptions;
   sveltePreprocess?:
     | SveltePreprocess
     | ((entry: string, options?: BumbleOptions) => SveltePreprocess);
-  build?: boolean;
-}
-
-export interface BumbleManifestDeps {
-  imports: string[];
-  exports: string[];
-}
-
-export interface BumbleManifest {
-  dir: string;
-  entry: string;
-  dependencies: Map<string, BumbleManifestDeps>;
-  external: Map<string, string[]>;
+  /** esbuild plugin resolve: https://esbuild.github.io/plugins/#on-resolve */
+  esbuildResolve?: (args: esbuildType.OnResolveArgs) => EsbuildResolve;
 }
 
 export interface BumbleBundle {
   script: Script;
-  manifest: BumbleManifest;
+  metafile: esbuildType.Metafile;
 }
 
 // Partial of `create_ssr_component` return type:
@@ -60,20 +66,3 @@ export type BumbleModule<M> = M & {
 export type ParseExportMap = Map<string, string>;
 
 export type ParseImportMap = Map<string, Array<{alias: string; local: string}>>;
-
-export interface CompileProps {
-  entry: string;
-  options: BumbleOptions;
-  manifest: BumbleManifest;
-  compiled: Set<string>;
-  external: Array<{
-    from: string;
-    names: Array<{alias: string; local: string}>;
-  }>;
-}
-
-declare global {
-  interface Window {
-    '📦': Record<string, unknown>;
-  }
-}

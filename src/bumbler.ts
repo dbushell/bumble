@@ -1,15 +1,8 @@
 import {fs, path, deepMerge} from './deps.ts';
-import {bundleModule} from './bundle.ts';
 import {importBundle} from './module.ts';
-import {compilerOptions} from './lib/typescript.ts';
-import {esbuildStop} from './esbuild/mod.ts';
+import {esbuildBundle, esbuildStop, esbuildType} from './esbuild.ts';
 import {encodeHash, serialize, deserialize} from './utils.ts';
-import type {
-  BumbleOptions,
-  BumbleBundle,
-  BumbleManifest,
-  BumbleModule
-} from './types.ts';
+import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 export class Bumbler<M> {
   #dir: string;
@@ -20,8 +13,7 @@ export class Bumbler<M> {
     this.#options = deepMerge<BumbleOptions>(
       {
         dev: false,
-        dynamicImports: false,
-        typescript: compilerOptions
+        dynamicImports: false
       },
       options ?? {}
     );
@@ -54,7 +46,7 @@ export class Bumbler<M> {
 
   async #bumble(entry: string, options: BumbleOptions): Promise<BumbleBundle> {
     let bundle: BumbleBundle;
-    const suffix = options.svelte?.generate ?? '';
+    const suffix = options.svelteCompile?.generate ?? '';
     const cachePath = path.join(
       Deno.cwd(),
       '.dinossr',
@@ -64,7 +56,7 @@ export class Bumbler<M> {
     if (await fs.exists(cachePath)) {
       bundle = deserialize(await Deno.readTextFile(cachePath));
     } else {
-      bundle = await bundleModule(this.#dir, entry, options);
+      bundle = await esbuildBundle(this.#dir, entry, options);
       if (options.build) {
         await fs.ensureFile(cachePath);
         await Deno.writeTextFile(cachePath, serialize(bundle));
@@ -76,20 +68,16 @@ export class Bumbler<M> {
   async bumbleDOM(entry: string, options?: BumbleOptions): Promise<string> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
-      svelte: {
+      svelteCompile: {
         generate: 'dom'
       }
     });
     const s1 = performance.now();
     const bundle = await this.#bumble(entry, options);
-    let code = bundle.script.getCode({
+    const code = bundle.script.getCode({
       exports: true,
       filterExports: options?.filterExports
     });
-    for (const [from, imports] of bundle.manifest.external.entries()) {
-      const statement = `import { ${imports.join(', ')} } from "${from}";`;
-      code = `${statement}\n${code}`;
-    }
     if (options.dev) {
       const rel = path.relative(this.#dir, entry);
       const t1 = (performance.now() - s1).toFixed(2);
@@ -101,7 +89,10 @@ export class Bumbler<M> {
   async bumbleSSR(
     entry: string,
     options?: BumbleOptions
-  ): Promise<{manifest: BumbleManifest; mod: BumbleModule<M>}> {
+  ): Promise<{
+    metafile?: esbuildType.Metafile;
+    mod: BumbleModule<M>;
+  }> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
       svelte: {
@@ -119,6 +110,6 @@ export class Bumbler<M> {
       const t1 = (performance.now() - s1).toFixed(2);
       console.log(`🐝 ${t1}ms (${rel})`);
     }
-    return {mod, manifest: bundle.manifest};
+    return {mod, metafile: bundle.metafile};
   }
 }
