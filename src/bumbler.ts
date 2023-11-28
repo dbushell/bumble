@@ -96,7 +96,7 @@ export class Bumbler<M> {
   }> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
-      svelte: {
+      svelteCompile: {
         generate: 'ssr'
       }
     });
