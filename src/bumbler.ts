@@ -31,7 +31,7 @@ export class Bumbler<M> {
     if (!this.#options.build) {
       return;
     }
-    const cache = path.join(Deno.cwd(), '.dinossr');
+    const cache = path.join(Deno.cwd(), '.bumble');
     await fs.ensureDir(cache);
     for await (const dir of Deno.readDir(cache)) {
       if (dir.isDirectory && dir.name !== this.deployHash) {
@@ -50,7 +50,7 @@ export class Bumbler<M> {
     options: BumbleOptions
   ): Promise<BumbleBundle> {
     let bundle: BumbleBundle;
-    let cache = path.join(Deno.cwd(), '.dinossr', this.deployHash);
+    let cache = path.join(Deno.cwd(), '.bumble', this.deployHash);
     cache = path.join(cache, `${hash}.json`);
     if (await fs.exists(cache)) {
       bundle = deserialize(await Deno.readTextFile(cache));
