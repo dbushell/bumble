@@ -39,6 +39,7 @@ export interface BumbleOptions {
     | ((entry: string, options?: BumbleOptions) => SveltePreprocess);
   /** esbuild plugin resolve: https://esbuild.github.io/plugins/#on-resolve */
   esbuildResolve?: (args: esbuildType.OnResolveArgs) => EsbuildResolve;
+  esbuildOptions?: esbuildType.BuildOptions;
 }
 
 export interface BumbleBundle {

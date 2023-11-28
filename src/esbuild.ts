@@ -230,7 +230,7 @@ export const esbuildBundle = async (
     }
   };
   const esbuild = await esbuildStart();
-  const results = await esbuild.build({
+  const esbuildOptions: esbuildType.BuildOptions = {
     entryPoints: [entry],
     plugins: [sveltePlugin],
     format: 'esm',
@@ -240,9 +240,11 @@ export const esbuildBundle = async (
     minifyWhitespace: options?.svelteCompile?.generate === 'dom',
     minifyIdentifiers: options?.svelteCompile?.generate === 'dom',
     write: false,
-    metafile: true
-  });
-  const script = new Script(results.outputFiles[0].text, entry, dir);
-  const metafile = normalizeMeta(dir, results.metafile);
+    metafile: true,
+    ...options?.esbuildOptions
+  };
+  const results = await esbuild.build(esbuildOptions);
+  const script = new Script(results.outputFiles![0].text, entry, dir);
+  const metafile = normalizeMeta(dir, results.metafile!);
   return {script, metafile};
 };
