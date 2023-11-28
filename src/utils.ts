@@ -1,14 +1,9 @@
-import {hex} from './deps.ts';
+import {MurmurHash3} from './deps.ts';
 import Script from './script.ts';
 import type {SerializedScript} from './script.ts';
 
-export const hash = async (value: string, algorithm = 'SHA-256') =>
-  new Uint8Array(
-    await crypto.subtle.digest(algorithm, new TextEncoder().encode(value))
-  );
-
-export const encodeHash = async (value: string, algorithm?: string) =>
-  hex.encodeHex(await hash(value, algorithm));
+export const encodeHash = (value: string) =>
+  new MurmurHash3(value).result().toString(16);
 
 interface SerializedType<P> {
   type: string;

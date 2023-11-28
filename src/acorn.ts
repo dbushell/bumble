@@ -1,8 +1,14 @@
 import {acorn} from './deps.ts';
+import {encodeHash} from './utils.ts';
 import type {ParseExportMap, ParseImportMap} from './types.ts';
 
+const parseMap = new Map<string, acorn.Program>();
+
 const parse = (code: string) => {
+  const hash = encodeHash(code);
+  if (parseMap.has(hash)) return parseMap.get(hash)!;
   const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
+  parseMap.set(hash, ast);
   return ast;
 };
 

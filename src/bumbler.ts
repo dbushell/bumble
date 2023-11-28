@@ -73,7 +73,7 @@ export class Bumbler<M> {
       }
     });
     const rel = path.relative(this.#dir, entry) + '-dom';
-    const hash = await encodeHash(rel + this.deployHash, 'SHA-1');
+    const hash = encodeHash(rel + this.deployHash);
     const s1 = performance.now();
     const bundle = await this.#bumble(entry, hash, options);
     const code = bundle.script.getCode({
@@ -101,7 +101,7 @@ export class Bumbler<M> {
       }
     });
     const rel = path.relative(this.#dir, entry) + '-ssr';
-    const hash = await encodeHash(rel + this.deployHash, 'SHA-1');
+    const hash = encodeHash(rel + this.deployHash);
     const s1 = performance.now();
     const bundle = await this.#bumble(entry, hash, options);
     const s2 = performance.now();
