@@ -189,7 +189,7 @@ export const esbuildBundle = async (
           deffered.resolve(contents);
         }
         let contents = await deferredMap.get(key)!.promise;
-
+        let loader: esbuildType.Loader = 'js';
         // TODO: cleanup duplicate code
         if (args.path.endsWith('.svelte')) {
           const pathname = new URL(args.path).pathname;
@@ -201,10 +201,15 @@ export const esbuildBundle = async (
             deffered.resolve(compile.js.code);
           }
           contents = await deferredMap.get(key)!.promise;
+        } else {
+          const ext = path.extname(args.path).substring(1);
+          if (/^(js|ts|json)$/.test(ext)) {
+            loader = ext as esbuildType.Loader;
+          }
         }
         return {
           contents,
-          loader: 'js'
+          loader
         };
       });
       build.onLoad({filter: /\.svelte$/}, async (args) => {
