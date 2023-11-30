@@ -54,7 +54,7 @@ export class Bumbler<M> {
     options: BumbleOptions
   ): Promise<BumbleBundle> {
     let bundle: BumbleBundle;
-    let cache = path.join(Deno.cwd(), '.bumble', this.deployHash);
+    let cache = path.join(Deno.cwd(), this.buildDir, this.deployHash);
     cache = path.join(cache, `${hash}.json`);
     if (existsSync(cache)) {
       bundle = deserialize(await Deno.readTextFile(cache));
