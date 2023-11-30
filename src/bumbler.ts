@@ -1,13 +1,7 @@
-import {
-  path,
-  deepMerge,
-  existsSync,
-  ensureDirSync,
-  ensureFileSync
-} from './deps.ts';
+import {path, deepMerge, existsSync, ensureDirSync} from './deps.ts';
 import {importBundle} from './module.ts';
 import {esbuildBundle, esbuildStop, esbuildType} from './esbuild.ts';
-import {encodeHash, serialize, deserialize} from './utils.ts';
+import {encodeHash} from './utils.ts';
 import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
 
 export class Bumbler<M> {
@@ -40,7 +34,6 @@ export class Bumbler<M> {
   }
 
   get buildDir(): string {
-    // TODO: make this configurable?
     return path.join(Deno.cwd(), '.bumble');
   }
 
@@ -53,18 +46,19 @@ export class Bumbler<M> {
     hash: string,
     options: BumbleOptions
   ): Promise<BumbleBundle> {
-    let bundle: BumbleBundle;
-    let cache = path.join(Deno.cwd(), this.buildDir, this.deployHash);
-    cache = path.join(cache, `${hash}.json`);
-    if (existsSync(cache)) {
-      bundle = deserialize(await Deno.readTextFile(cache));
-      bundle.prebuild = true;
-    } else {
-      bundle = await esbuildBundle(this.#dir, entry, options);
-      if (options.build) {
-        ensureFileSync(cache);
-        await Deno.writeTextFile(cache, serialize(bundle));
-      }
+    const bundle = await esbuildBundle(this.#dir, entry, options);
+    if (options.build) {
+      await Deno.writeTextFile(
+        path.join(this.buildDir, `${hash}.json`),
+        JSON.stringify(bundle.metafile, null, 2)
+      );
+      await Deno.writeTextFile(
+        path.join(this.buildDir, `${hash}.js`),
+        bundle.script.getCode({
+          imports: true,
+          exports: true
+        })
+      );
     }
     return bundle;
   }
@@ -95,8 +89,8 @@ export class Bumbler<M> {
     entry: string,
     options?: BumbleOptions
   ): Promise<{
-    metafile?: esbuildType.Metafile;
     mod: BumbleModule<M>;
+    metafile: esbuildType.Metafile;
   }> {
     options = deepMerge<BumbleOptions>(this.#options, options ?? {});
     options = deepMerge<BumbleOptions>(options, {
