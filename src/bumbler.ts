@@ -1,4 +1,10 @@
-import {fs, path, deepMerge} from './deps.ts';
+import {
+  path,
+  deepMerge,
+  existsSync,
+  ensureDirSync,
+  ensureFileSync
+} from './deps.ts';
 import {importBundle} from './module.ts';
 import {esbuildBundle, esbuildStop, esbuildType} from './esbuild.ts';
 import {encodeHash, serialize, deserialize} from './utils.ts';
@@ -17,6 +23,12 @@ export class Bumbler<M> {
       },
       options ?? {}
     );
+    if (this.#options.build) {
+      if (existsSync(this.buildDir)) {
+        Deno.removeSync(this.buildDir, {recursive: true});
+      }
+      ensureDirSync(this.buildDir);
+    }
   }
 
   get dev(): boolean {
@@ -27,17 +39,9 @@ export class Bumbler<M> {
     return this.#options.deployHash ?? 'bumble';
   }
 
-  async start() {
-    if (!this.#options.build) {
-      return;
-    }
-    const cache = path.join(Deno.cwd(), '.bumble');
-    await fs.ensureDir(cache);
-    for await (const dir of Deno.readDir(cache)) {
-      if (dir.isDirectory && dir.name !== this.deployHash) {
-        await Deno.remove(path.join(cache, dir.name), {recursive: true});
-      }
-    }
+  get buildDir(): string {
+    // TODO: make this configurable?
+    return path.join(Deno.cwd(), '.bumble');
   }
 
   stop(): void {
@@ -52,13 +56,13 @@ export class Bumbler<M> {
     let bundle: BumbleBundle;
     let cache = path.join(Deno.cwd(), '.bumble', this.deployHash);
     cache = path.join(cache, `${hash}.json`);
-    if (await fs.exists(cache)) {
+    if (existsSync(cache)) {
       bundle = deserialize(await Deno.readTextFile(cache));
       bundle.prebuild = true;
     } else {
       bundle = await esbuildBundle(this.#dir, entry, options);
       if (options.build) {
-        await fs.ensureFile(cache);
+        ensureFileSync(cache);
         await Deno.writeTextFile(cache, serialize(bundle));
       }
     }
