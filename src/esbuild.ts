@@ -28,6 +28,27 @@ export const esbuildStop = () => {
 };
 
 const deferredMap = new Map<string, Deferred<string>>();
+const mtimeMap = new Map<string, number>();
+
+const deferredCode = (
+  key: string,
+  entry: string | null,
+  callback: () => Promise<string>
+) => {
+  if (entry) {
+    const stat = Deno.statSync(entry);
+    if (stat.mtime && stat.mtime.getTime() !== mtimeMap.get(key)) {
+      mtimeMap.set(key, stat.mtime.getTime());
+      deferredMap.delete(key);
+    }
+  }
+  if (!deferredMap.has(key)) {
+    const deffered = Promise.withResolvers<string>();
+    deferredMap.set(key, deffered);
+    callback().then((code) => deffered.resolve(code));
+  }
+  return deferredMap.get(key)!.promise;
+};
 
 const componentName = (entry: string) => {
   const ext = path.extname(entry);
@@ -181,26 +202,22 @@ export const esbuildBundle = async (
       });
       build.onLoad({filter: /^(file|https):/}, async (args) => {
         const key = `fetch:${args.path}`;
-        if (!deferredMap.has(key)) {
-          const deffered = Promise.withResolvers<string>();
-          deferredMap.set(key, deffered);
-          const response = await fetch(args.path);
-          const contents = await response.text();
-          deffered.resolve(contents);
-        }
-        let contents = await deferredMap.get(key)!.promise;
         let loader: esbuildType.Loader = 'js';
-        // TODO: cleanup duplicate code
+        let contents = await deferredCode(key, null, async () => {
+          const response = await fetch(args.path);
+          if (!response.ok) {
+            console.error(`Failed to fetch: "${args.path}"`, response);
+            throw new Error();
+          }
+          return await response.text();
+        });
         if (args.path.endsWith('.svelte')) {
           const pathname = new URL(args.path).pathname;
           const key = `compile:${generate}:${pathname}`;
-          if (!deferredMap.has(key)) {
-            const deffered = Promise.withResolvers<string>();
-            deferredMap.set(key, deffered);
+          contents = await deferredCode(key, null, async () => {
             const compile = await process(pathname, contents);
-            deffered.resolve(compile.js.code);
-          }
-          contents = await deferredMap.get(key)!.promise;
+            return compile.js.code;
+          });
         } else {
           const ext = path.extname(args.path).substring(1);
           if (/^(js|ts|json)$/.test(ext)) {
@@ -214,22 +231,21 @@ export const esbuildBundle = async (
       });
       build.onLoad({filter: /\.svelte$/}, async (args) => {
         const key = `compile:${generate}:${args.path}`;
-        if (!deferredMap.has(key)) {
-          const deffered = Promise.withResolvers<string>();
-          deferredMap.set(key, deffered);
-          const compile = await process(args.path);
-          deffered.resolve(compile.js.code);
-        }
         return {
-          contents: await deferredMap.get(key)!.promise
+          contents: await deferredCode(key, args.path, async () => {
+            const compile = await process(args.path);
+            return compile.js.code;
+          })
         };
       });
       build.onLoad({filter: /\.(js|ts|json)$/}, async (args) => {
-        const src = await Deno.readTextFile(args.path);
-        const ext = path.extname(args.path);
+        const key = `file:${generate}:${args.path}`;
+        const ext = path.extname(args.path).substring(1);
         return {
-          contents: src,
-          loader: ext.substring(1) as esbuildType.Loader
+          contents: await deferredCode(key, args.path, () => {
+            return Deno.readTextFile(args.path);
+          }),
+          loader: ext as esbuildType.Loader
         };
       });
     }
