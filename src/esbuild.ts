@@ -1,11 +1,11 @@
 import {path, svelte} from './deps.ts';
 import Script from './script.ts';
 import type {Deferred, BumbleBundleOptions, EsbuildMetafile} from './types.ts';
-import * as esbuildType from 'https://deno.land/x/esbuild@v0.19.6/mod.d.ts';
+import * as EsbuildType from 'https://deno.land/x/esbuild@v0.19.6/mod.d.ts';
 
-export type {esbuildType};
+export type {EsbuildType};
 
-let esbuild: typeof esbuildType | undefined;
+let esbuild: typeof EsbuildType | undefined;
 
 export const esbuildStart = async () => {
   if (esbuild) {
@@ -159,7 +159,7 @@ export const esbuildBundle = async (
     return result;
   };
 
-  const sveltePlugin: esbuildType.Plugin = {
+  const sveltePlugin: EsbuildType.Plugin = {
     name: 'svelte',
     setup(build) {
       build.onResolve({filter: /.*/}, async (args) => {
@@ -202,7 +202,7 @@ export const esbuildBundle = async (
       });
       build.onLoad({filter: /^(file|https):/}, async (args) => {
         const key = `fetch:${args.path}`;
-        let loader: esbuildType.Loader = 'js';
+        let loader: EsbuildType.Loader = 'js';
         let contents = await deferredCode(key, null, async () => {
           const response = await fetch(args.path);
           if (!response.ok) {
@@ -221,7 +221,7 @@ export const esbuildBundle = async (
         } else {
           const ext = path.extname(args.path).substring(1);
           if (/^(js|ts|json)$/.test(ext)) {
-            loader = ext as esbuildType.Loader;
+            loader = ext as EsbuildType.Loader;
           }
         }
         return {
@@ -245,13 +245,13 @@ export const esbuildBundle = async (
           contents: await deferredCode(key, args.path, () => {
             return Deno.readTextFile(args.path);
           }),
-          loader: ext as esbuildType.Loader
+          loader: ext as EsbuildType.Loader
         };
       });
     }
   };
   const esbuild = await esbuildStart();
-  const esbuildOptions: esbuildType.BuildOptions = {
+  const esbuildOptions: EsbuildType.BuildOptions = {
     entryPoints: [entry],
     plugins: [sveltePlugin],
     format: 'esm',

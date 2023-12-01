@@ -1,11 +1,12 @@
 import {path, existsSync, ensureDirSync} from './deps.ts';
 import {importBundle} from './module.ts';
-import {esbuildBundle, esbuildStop, esbuildType} from './esbuild.ts';
+import {esbuildBundle, esbuildStop} from './esbuild.ts';
 import type {
   BumbleOptions,
   BumbleBundleOptions,
   BumbleBundle,
-  BumbleModule
+  BumbleDOMBundle,
+  BumbleSSRBundle
 } from './types.ts';
 
 export class Bumbler<M> {
@@ -74,7 +75,7 @@ export class Bumbler<M> {
     entry: string,
     hash: string,
     options: BumbleBundleOptions = {}
-  ): Promise<string> {
+  ): Promise<BumbleDOMBundle> {
     options.svelteCompile = {
       ...options.svelteCompile,
       generate: 'dom'
@@ -90,17 +91,14 @@ export class Bumbler<M> {
       const t1 = (performance.now() - s1).toFixed(2).padStart(7, ' ');
       console.log(`📦 ${t1}ms [dom] ${rel}`);
     }
-    return code;
+    return {entry, hash, code, metafile: bundle.metafile};
   }
 
   async bumbleSSR(
     entry: string,
     hash: string,
     options: BumbleBundleOptions = {}
-  ): Promise<{
-    mod: BumbleModule<M>;
-    metafile: esbuildType.Metafile;
-  }> {
+  ): Promise<BumbleSSRBundle<M>> {
     options.svelteCompile = {
       ...options.svelteCompile,
       generate: 'ssr'
@@ -116,6 +114,6 @@ export class Bumbler<M> {
       console.log(`📦 ${t1}ms [ssr] ${rel}`);
       console.log(`🐝 ${t2}ms [ssr] ↑`);
     }
-    return {mod, metafile: bundle.metafile};
+    return {entry, hash, mod, metafile: bundle.metafile};
   }
 }
