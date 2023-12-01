@@ -1,6 +1,6 @@
 import {path, svelte} from './deps.ts';
 import Script from './script.ts';
-import type {Deferred, BumbleOptions, EsbuildMetafile} from './types.ts';
+import type {Deferred, BumbleBundleOptions, EsbuildMetafile} from './types.ts';
 import * as esbuildType from 'https://deno.land/x/esbuild@v0.19.6/mod.d.ts';
 
 export type {esbuildType};
@@ -106,12 +106,12 @@ const normalizeMeta = (dir: string, oldMeta: EsbuildMetafile) => {
 export const esbuildBundle = async (
   dir: string,
   entry: string,
-  options?: BumbleOptions
+  options: BumbleBundleOptions
 ) => {
-  const generate = options?.svelteCompile?.generate ?? 'ssr';
+  const generate = options.svelteCompile?.generate ?? 'ssr';
 
   const group: Array<svelte.PreprocessorGroup> = [];
-  let preprocess = options?.sveltePreprocess;
+  let preprocess = options.sveltePreprocess;
   if (preprocess) {
     if (typeof preprocess === 'function') {
       preprocess = preprocess(entry, options);

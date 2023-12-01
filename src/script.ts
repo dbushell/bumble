@@ -1,13 +1,17 @@
 import {path} from './deps.ts';
 import {parseExports, parseImports, filterExports} from './acorn.ts';
-import type {BumbleOptions, ParseExportMap, ParseImportMap} from './types.ts';
+import type {
+  BumbleBundleOptions,
+  ParseExportMap,
+  ParseImportMap
+} from './types.ts';
 
 const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];
 
 interface CodeOptions {
   imports?: boolean;
   exports?: boolean;
-  filterExports?: BumbleOptions['filterExports'];
+  filterExports?: BumbleBundleOptions['filterExports'];
 }
 
 export default class Script {

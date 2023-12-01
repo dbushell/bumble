@@ -1,14 +1,14 @@
-import type {BumbleOptions, BumbleBundle, BumbleModule} from './types.ts';
+import type {BumbleBundle, BumbleModule} from './types.ts';
 
 /** Import bundle from a blob URL */
 export const importDynamicBundle = async <M>(
   bundle: BumbleBundle,
-  options?: BumbleOptions
+  filterExports?: string[]
 ): Promise<BumbleModule<M>> => {
   const {script} = bundle;
   const code = script.getCode({
     exports: true,
-    filterExports: options?.filterExports
+    filterExports
   });
   const blob = new Blob([code], {type: 'text/javascript'});
   const url = URL.createObjectURL(blob);
@@ -20,16 +20,16 @@ export const importDynamicBundle = async <M>(
 /** Evaluate bundle in a function that returns the exports */
 export const importFunctionBundle = <M>(
   bundle: BumbleBundle,
-  options?: BumbleOptions
+  filterExports?: string[]
 ): Promise<BumbleModule<M>> => {
   const {script} = bundle;
   let code = script.getCode({
     exports: false,
-    filterExports: options?.filterExports
+    filterExports
   });
   const values: string[] = [];
   for (const [alias, name] of script.exports) {
-    if (options?.filterExports?.includes(alias) === false) {
+    if (filterExports?.includes(alias) === false) {
       continue;
     }
     values.push(`${alias}:${name}`);
@@ -42,10 +42,11 @@ export const importFunctionBundle = <M>(
 /** Import module bundle */
 export const importBundle = <M>(
   bundle: BumbleBundle,
-  options?: BumbleOptions
+  dynamicImports: boolean,
+  filterExports?: string[]
 ): Promise<BumbleModule<M>> => {
-  if (options?.dynamicImports) {
-    return importDynamicBundle<M>(bundle, options);
+  if (dynamicImports) {
+    return importDynamicBundle<M>(bundle, filterExports);
   }
-  return importFunctionBundle<M>(bundle, options);
+  return importFunctionBundle<M>(bundle, filterExports);
 };

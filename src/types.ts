@@ -20,32 +20,33 @@ export type EsbuildMetafile = Exclude<
   undefined
 >;
 
-export interface BumbleOptions {
-  [key: PropertyKey]: unknown;
+export type BumbleOptions = {
   /** Debug output */
   dev?: boolean;
-  /** Used to cache compiled routes */
-  deployHash?: string;
-  /** Dynamic imports are faster and safer */
-  dynamicImports?: boolean;
   /** Generate pre-built bundles */
   build?: boolean;
+  /** Path of pre-built bundles */
+  buildDir?: string;
+  /** Dynamic imports are faster and safer */
+  dynamicImports?: boolean;
+};
+
+export type BumbleBundleOptions = {
   /** Exclusive list of top-level bundle exports */
   filterExports?: string[];
   /** Svelte compiler options: https://svelte.dev/docs/svelte-compiler#types-compileoptions */
   svelteCompile?: svelte.CompileOptions;
   sveltePreprocess?:
     | SveltePreprocess
-    | ((entry: string, options?: BumbleOptions) => SveltePreprocess);
+    | ((entry: string, options: BumbleBundleOptions) => SveltePreprocess);
   /** esbuild plugin resolve: https://esbuild.github.io/plugins/#on-resolve */
   esbuildResolve?: (args: esbuildType.OnResolveArgs) => EsbuildResolve;
   esbuildOptions?: esbuildType.BuildOptions;
-}
+};
 
 export interface BumbleBundle {
   script: Script;
   metafile: esbuildType.Metafile;
-  prebuild?: boolean;
 }
 
 // Partial of `create_ssr_component` return type:
