@@ -27,6 +27,29 @@ export const esbuildStop = () => {
   }
 };
 
+const TOKENS = new Map<string, string>();
+if (Deno.env.has('DENO_AUTH_TOKENS')) {
+  const tokens = Deno.env
+    .get('DENO_AUTH_TOKENS')!
+    .split(';')
+    .map((t) => t.trim().split('@'));
+  for (const [token, host] of tokens) {
+    TOKENS.set(host, token);
+  }
+}
+
+const fetchHeaders = (fetchpath: string) => {
+  const headers: Record<string, string> = {};
+  const url = new URL(fetchpath);
+  for (const [k, v] of TOKENS) {
+    if (url.host.startsWith(k)) {
+      headers['authorization'] = `Bearer ${v}`;
+      break;
+    }
+  }
+  return headers;
+};
+
 const deferredMap = new Map<string, Deferred<string>>();
 const mtimeMap = new Map<string, number>();
 
@@ -204,7 +227,9 @@ export const esbuildBundle = async (
         const key = `fetch:${args.path}`;
         let loader: EsbuildType.Loader = 'js';
         let contents = await deferredCode(key, null, async () => {
-          const response = await fetch(args.path);
+          const response = await fetch(args.path, {
+            headers: {...fetchHeaders(args.path)}
+          });
           if (!response.ok) {
             console.error(`Failed to fetch: "${args.path}"`, response);
             throw new Error();
