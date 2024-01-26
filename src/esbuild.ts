@@ -1,7 +1,7 @@
 import {path, svelte} from './deps.ts';
 import Script from './script.ts';
 import type {Deferred, BumbleBundleOptions, EsbuildMetafile} from './types.ts';
-import * as EsbuildType from 'https://deno.land/x/esbuild@v0.19.12/mod.d.ts';
+import * as EsbuildType from 'https://raw.githubusercontent.com/evanw/esbuild/main/lib/shared/types.ts';
 
 export type {EsbuildType};
 
@@ -13,10 +13,8 @@ export const esbuildStart = async () => {
   }
   const wasm = Deno.env.has('DENO_REGION');
   esbuild = wasm
-    // ? await import('https://deno.land/x/esbuild@v0.19.12/wasm.js')
-    // : await import('https://deno.land/x/esbuild@v0.19.12/mod.js');
-    ? await import('https://raw.githubusercontent.com/dbushell/deno-esbuild/main/wasm.js')
-    : await import('https://raw.githubusercontent.com/dbushell/deno-esbuild/main/mod.js');
+    ? await import('npm:esbuild-wasm@0.19.12')
+    : await import('npm:esbuild@0.19.12');
   await esbuild.initialize({
     worker: false
   });
