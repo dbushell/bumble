@@ -31,7 +31,7 @@ export class Bumbler<M> {
   get dynamicImports() {
     return (
       // Deno Deploy does not support dynamic imports as used
-      this.#options.dynamicImports ?? !Deno.env.has('DENO_REGION') === false
+      this.#options.dynamicImports ?? !Deno.env.has('DENO_REGION')
     );
   }
 
