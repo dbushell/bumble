@@ -199,7 +199,7 @@ export const esbuildBundle = async (
         if (args.path.startsWith('svelte')) {
           const href = `https://esm.sh/${args.path.replace(
             'svelte',
-            'svelte@4.2.7'
+            `svelte@${svelte.VERSION}`
           )}?target=esnext`;
           return {
             path: href,
