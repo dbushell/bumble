@@ -1,32 +1,21 @@
 import {path} from './deps.ts';
-import {parseExports, parseImports, filterExports} from './acorn.ts';
-import type {
-  BumbleBundleOptions,
-  ParseExportMap,
-  ParseImportMap
-} from './types.ts';
+import {parseExports, parseImports, stripExports} from './acorn.ts';
+import type {ParseExportMap, ParseImportMap} from './types.ts';
 
 const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];
 
 interface CodeOptions {
-  imports?: boolean;
-  exports?: boolean;
-  filterExports?: BumbleBundleOptions['filterExports'];
+  exports?: boolean | string[];
+  exportType: 'module' | 'function';
 }
 
 export default class Script {
   #code: string;
-  #entry: string;
-  #dir: string;
-  #prefix: string[] = [];
-  #suffix: string[] = [];
   #imports: ParseImportMap;
   #exports: ParseExportMap;
 
-  constructor(code: string, entry: string, dir: string) {
+  constructor(code: string) {
     this.#code = code;
-    this.#entry = entry;
-    this.#dir = dir;
     ({code: this.#code, map: this.#imports} = parseImports(this.#code));
     ({code: this.#code, map: this.#exports} = parseExports(this.#code));
   }
@@ -39,64 +28,49 @@ export default class Script {
     return this.#exports;
   }
 
-  get localImports() {
-    const map: ParseImportMap = new Map();
-    for (let [from, names] of this.#imports) {
-      if (from.startsWith('@')) {
-        from = path.resolve(this.#dir, from.slice(1));
-      }
-      if (/^(file|https):/.test(from)) {
-        map.set(from, names);
-        continue;
-      }
-      if ((/^(\.|\/)/.test(from) && Script.supportedType(from)) === false) {
-        continue;
-      }
-      map.set(path.resolve(path.dirname(this.#entry), from), names);
-    }
-    return map;
-  }
-
-  get externalImports() {
-    const map: ParseImportMap = new Map();
-    for (const [from, names] of this.#imports) {
-      if (/^(file|https):/.test(from)) {
-        continue;
-      }
-      if (/^(\.|\/|@)/.test(from)) {
-        continue;
-      }
-      map.set(from, names);
-    }
-    return map;
-  }
-
-  append(code: string) {
-    this.#suffix.push(code);
-  }
-
-  prepend(code: string) {
-    this.#prefix.push(code);
-  }
-
-  getExport(allowed?: CodeOptions['filterExports']) {
+  /** Combine all (or specific) exports into one `export` statement */
+  serializeModule(exports?: CodeOptions['exports']) {
+    if (exports === false) return 'export {};';
     const parts = [];
     for (const [alias, name] of this.#exports) {
-      if (allowed?.includes(alias) === false) continue;
-      parts.push(alias === name ? name : `${name} as ${alias}`);
+      if (
+        exports === true ||
+        (Array.isArray(exports) && exports.includes(alias))
+      ) {
+        parts.push(alias === name ? name : `${name} as ${alias}`);
+      }
     }
     return `export { ${parts.join(', ')} };`;
   }
 
-  getCode(options: CodeOptions = {}) {
-    let code = this.#prefix.toReversed().join('\n');
-    code += `\n${this.#code}\n`;
-    code += this.#suffix.join('\n');
-    if (options.filterExports) {
-      code = filterExports(code, this.#exports, options.filterExports);
+  /** Combine all (or specific) exports into one `return` statement */
+  serializeFunction(exports?: CodeOptions['exports']) {
+    if (exports === false) return 'return {};';
+    const parts = [];
+    for (const [alias, name] of this.#exports) {
+      if (
+        exports === true ||
+        (Array.isArray(exports) && exports.includes(alias))
+      ) {
+        parts.push(alias === name ? name : `${alias} : ${name}`);
+      }
+    }
+    return `return { ${parts.join(', ')} };`;
+  }
+
+  /** Serialize script with optional exports */
+  serialize(options: CodeOptions = {exportType: 'module'}) {
+    let code = this.#code;
+    if (Array.isArray(options.exports)) {
+      code = stripExports(code, this.#exports, options.exports);
     }
     if (options.exports) {
-      code += `\n${this.getExport(options.filterExports)}\n`;
+      if (options.exportType === 'module') {
+        code += `\n${this.serializeModule(options.exports)}\n`;
+      }
+      if (options.exportType === 'function') {
+        code += `\n${this.serializeFunction(options.exports)}\n`;
+      }
     }
     return code;
   }

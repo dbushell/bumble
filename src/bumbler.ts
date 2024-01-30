@@ -62,9 +62,9 @@ export class Bumbler<M> {
       // Write the esbuild bundled script
       await Deno.writeTextFile(
         path.join(this.buildDir, `${hash}.js`),
-        bundle.script.getCode({
-          imports: true,
-          exports: true
+        bundle.script.serialize({
+          exports: true,
+          exportType: 'module'
         })
       );
     }
@@ -82,9 +82,9 @@ export class Bumbler<M> {
     };
     const s1 = performance.now();
     const bundle = await this.#bumble(entry, hash, options);
-    const code = bundle.script.getCode({
-      exports: true,
-      filterExports: options.filterExports
+    const code = bundle.script.serialize({
+      exports: options.exports ?? true,
+      exportType: 'module'
     });
     if (this.dev) {
       const rel = path.relative(this.#dir, entry) + '-dom';
@@ -107,7 +107,11 @@ export class Bumbler<M> {
     const bundle = await this.#bumble(entry, hash, options);
     const t1 = (performance.now() - s1).toFixed(2).padStart(7, ' ');
     const s2 = performance.now();
-    const mod = await importBundle<M>(bundle, this.dynamicImports);
+    const mod = await importBundle<M>(
+      bundle,
+      this.dynamicImports,
+      options.exports
+    );
     if (this.dev) {
       const rel = path.relative(this.#dir, entry);
       const t2 = (performance.now() - s2).toFixed(2).padStart(7, ' ');

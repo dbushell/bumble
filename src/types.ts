@@ -33,7 +33,7 @@ export type BumbleOptions = {
 
 export type BumbleBundleOptions = {
   /** Exclusive list of top-level bundle exports */
-  filterExports?: string[];
+  exports?: boolean | string[];
   /** Svelte compiler options: https://svelte.dev/docs/svelte-compiler#types-compileoptions */
   svelteCompile?: svelte.CompileOptions;
   sveltePreprocess?:

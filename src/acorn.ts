@@ -143,7 +143,7 @@ export const parseExports = (
   return {code, map};
 };
 
-export const filterExports = (
+export const stripExports = (
   code: string,
   exports: ParseExportMap,
   allowed: string[]

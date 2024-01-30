@@ -290,7 +290,7 @@ export const esbuildBundle = async (
     ...options?.esbuildOptions
   };
   const results = await esbuild.build(esbuildOptions);
-  const script = new Script(results.outputFiles![0].text, entry, dir);
+  const script = new Script(results.outputFiles![0].text);
   const metafile = normalizeMeta(dir, results.metafile!);
   return {script, metafile};
 };
