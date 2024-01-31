@@ -2,7 +2,7 @@ import {path, svelte} from './deps.ts';
 import Script from './script.ts';
 import type {Deferred, BumbleBundleOptions, EsbuildMetafile} from './types.ts';
 import * as EsbuildType from 'https://raw.githubusercontent.com/evanw/esbuild/v0.20.0/lib/shared/types.ts';
-
+import {encodeHash} from './utils.ts';
 export type {EsbuildType};
 
 let esbuild: typeof EsbuildType | undefined;
@@ -50,6 +50,7 @@ const fetchHeaders = (fetchpath: string) => {
   return headers;
 };
 
+const processedMap = new Map<string, Promise<svelte.Processed>>();
 const deferredMap = new Map<string, Deferred<string>>();
 const mtimeMap = new Map<string, number>();
 
@@ -126,6 +127,37 @@ const normalizeMeta = (dir: string, oldMeta: EsbuildMetafile) => {
   return newMeta;
 };
 
+const tsPreprocess: svelte.PreprocessorGroup = {
+  script: ({content, attributes}) => {
+    // Skip non-TypeScript code
+    if (attributes.lang !== 'ts') {
+      return Promise.resolve({code: content});
+    }
+    // Check if code is already processed
+    const hash = encodeHash(content);
+    if (processedMap.has(hash)) {
+      return processedMap.get(hash);
+    }
+    // Process TypeScript code and return cached promise
+    const {promise, resolve} = Promise.withResolvers<svelte.Processed>();
+    processedMap.set(hash, promise);
+    esbuild!
+      .transform(content, {
+        loader: 'ts',
+        format: 'esm',
+        target: 'esnext',
+        tsconfigRaw: {
+          compilerOptions: {
+            target: 'esnext',
+            verbatimModuleSyntax: true
+          }
+        }
+      })
+      .then(({code}) => resolve({code}));
+    return promise;
+  }
+};
+
 export const esbuildBundle = async (
   dir: string,
   entry: string,
@@ -133,7 +165,8 @@ export const esbuildBundle = async (
 ) => {
   const generate = options.svelteCompile?.generate ?? 'ssr';
 
-  const group: Array<svelte.PreprocessorGroup> = [];
+  // Setup preprocessors
+  const group: Array<svelte.PreprocessorGroup> = [tsPreprocess];
   let preprocess = options.sveltePreprocess;
   if (preprocess) {
     if (typeof preprocess === 'function') {
@@ -144,30 +177,9 @@ export const esbuildBundle = async (
 
   const process = async (entry: string, src?: string) => {
     src ??= await Deno.readTextFile(entry);
-    group.unshift({
-      script: async ({content, attributes}) => {
-        if (attributes.lang === 'ts') {
-          const result = await esbuild.transform(content, {
-            loader: 'ts',
-            format: 'esm',
-            target: 'esnext',
-            tsconfigRaw: {
-              compilerOptions: {
-                target: 'esnext',
-                verbatimModuleSyntax: true
-              }
-            }
-          });
-          return {code: result.code};
-        }
-        return {code: content};
-      }
-    });
-
     const preprocess = await svelte.preprocess(src, [...group], {
       filename: entry
     });
-
     const opts: svelte.CompileOptions = {
       name: componentName(entry),
       generate: 'ssr',
