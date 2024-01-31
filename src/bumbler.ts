@@ -1,6 +1,6 @@
 import {path, existsSync, ensureDirSync} from './deps.ts';
 import {importBundle} from './module.ts';
-import {esbuildBundle, esbuildStop} from './esbuild.ts';
+import {esbuildBundle, esbuildStop} from './esbuild/mod.ts';
 import type {
   BumbleOptions,
   BumbleBundleOptions,

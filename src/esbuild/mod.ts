@@ -1,9 +1,8 @@
-import {path, svelte} from './deps.ts';
-import Script from './script.ts';
-import type {Deferred, BumbleBundleOptions, EsbuildMetafile} from './types.ts';
-import * as EsbuildType from 'https://raw.githubusercontent.com/evanw/esbuild/v0.20.0/lib/shared/types.ts';
-import {encodeHash} from './utils.ts';
-export type {EsbuildType};
+import {path, svelte} from '../deps.ts';
+import Script from '../script.ts';
+import {typescriptGroup} from './typescript.ts';
+import {componentName, normalizeMeta} from './utils.ts';
+import type {EsbuildType, Deferred, BumbleBundleOptions} from '../types.ts';
 
 let esbuild: typeof EsbuildType | undefined;
 
@@ -50,7 +49,6 @@ const fetchHeaders = (fetchpath: string) => {
   return headers;
 };
 
-const processedMap = new Map<string, Promise<svelte.Processed>>();
 const deferredMap = new Map<string, Deferred<string>>();
 const mtimeMap = new Map<string, number>();
 
@@ -74,108 +72,27 @@ const deferredCode = (
   return deferredMap.get(key)!.promise;
 };
 
-const componentName = (entry: string) => {
-  const ext = path.extname(entry);
-  let name = path.basename(entry, ext);
-  if (ext === '.svelte') {
-    name = name
-      .split('-')
-      .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-      .join('');
-  }
-  return name;
-};
-
-const normalizeKey = (dir: string, key: string) => {
-  // Ignore prefixed paths like `fetch:`
-  if (/^.+?:/.test(key)) {
-    return key;
-  }
-  // Check if WASM path or relative path
-  let newKey = `/${key}`;
-  if (!newKey.startsWith(dir)) {
-    newKey = path.resolve(Deno.cwd(), `${key}`);
-  }
-  newKey = path.relative(dir, newKey);
-  return newKey;
-};
-
-// Resolve all metafile paths to relative paths
-// esbuild WASM resolves differently
-const normalizeMeta = (dir: string, oldMeta: EsbuildMetafile) => {
-  const newMeta: EsbuildMetafile = {inputs: {}, outputs: {}};
-  if (Object.hasOwn(newMeta, 'inputs')) {
-    for (const [k, input] of Object.entries(oldMeta.inputs)) {
-      const newInput = structuredClone(input);
-      newMeta.inputs[normalizeKey(dir, k)] = newInput;
-      for (const v2 of newInput.imports) {
-        v2.path = normalizeKey(dir, v2.path);
-      }
-    }
-    for (const [k, output] of Object.entries(oldMeta.outputs)) {
-      const newOutput = structuredClone(output);
-      newMeta.outputs[k] = newOutput;
-      if (newOutput.entryPoint) {
-        newOutput.entryPoint = normalizeKey(dir, newOutput.entryPoint);
-      }
-      for (const [k2, v2] of Object.entries(newOutput.inputs)) {
-        delete newOutput.inputs[k2];
-        newOutput.inputs[normalizeKey(dir, k2)] = v2;
-      }
-    }
-  }
-  return newMeta;
-};
-
-const tsPreprocess: svelte.PreprocessorGroup = {
-  script: ({content, attributes}) => {
-    // Skip non-TypeScript code
-    if (attributes.lang !== 'ts') {
-      return Promise.resolve({code: content});
-    }
-    // Check if code is already processed
-    const hash = encodeHash(content);
-    if (processedMap.has(hash)) {
-      return processedMap.get(hash);
-    }
-    // Process TypeScript code and return cached promise
-    const {promise, resolve} = Promise.withResolvers<svelte.Processed>();
-    processedMap.set(hash, promise);
-    esbuild!
-      .transform(content, {
-        loader: 'ts',
-        format: 'esm',
-        target: 'esnext',
-        tsconfigRaw: {
-          compilerOptions: {
-            target: 'esnext',
-            verbatimModuleSyntax: true
-          }
-        }
-      })
-      .then(({code}) => resolve({code}));
-    return promise;
-  }
-};
-
 export const esbuildBundle = async (
   dir: string,
   entry: string,
   options: BumbleBundleOptions
 ) => {
+  const esbuild = await esbuildStart();
   const generate = options.svelteCompile?.generate ?? 'ssr';
 
   // Setup preprocessors
-  const group: Array<svelte.PreprocessorGroup> = [tsPreprocess];
-  let preprocess = options.sveltePreprocess;
-  if (preprocess) {
-    if (typeof preprocess === 'function') {
-      preprocess = preprocess(entry, options);
+  const group: Array<svelte.PreprocessorGroup> = [
+    typescriptGroup(esbuild.transform)
+  ];
+  let svelteGroup = options.sveltePreprocess;
+  if (svelteGroup) {
+    if (typeof svelteGroup === 'function') {
+      svelteGroup = svelteGroup(entry, options);
     }
-    group.push(...[preprocess].flat(2));
+    group.push(...[svelteGroup].flat(2));
   }
 
-  const process = async (entry: string, src?: string) => {
+  const svelteProcess = async (entry: string, src?: string) => {
     src ??= await Deno.readTextFile(entry);
     const preprocess = await svelte.preprocess(src, [...group], {
       filename: entry
@@ -252,7 +169,7 @@ export const esbuildBundle = async (
           const pathname = new URL(args.path).pathname;
           const key = `compile:${generate}:${pathname}`;
           contents = await deferredCode(key, null, async () => {
-            const compile = await process(pathname, contents);
+            const compile = await svelteProcess(pathname, contents);
             return compile.js.code;
           });
         } else {
@@ -270,7 +187,7 @@ export const esbuildBundle = async (
         const key = `compile:${generate}:${args.path}`;
         return {
           contents: await deferredCode(key, args.path, async () => {
-            const compile = await process(args.path);
+            const compile = await svelteProcess(args.path);
             return compile.js.code;
           })
         };
@@ -287,7 +204,7 @@ export const esbuildBundle = async (
       });
     }
   };
-  const esbuild = await esbuildStart();
+
   const esbuildOptions: EsbuildType.BuildOptions = {
     entryPoints: [entry],
     plugins: [sveltePlugin],

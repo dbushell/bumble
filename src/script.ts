@@ -1,5 +1,5 @@
 import {path} from './deps.ts';
-import {parseExports, parseImports, stripExports} from './acorn.ts';
+import {parseExports, parseImports, stripExports} from './acorn/mod.ts';
 import type {ParseExportMap, ParseImportMap} from './types.ts';
 
 const supportedExtensions = ['.svelte', '.ts', '.js', '.json'];

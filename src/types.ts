@@ -1,6 +1,8 @@
 import {svelte} from './deps.ts';
 import Script from './script.ts';
-import type {EsbuildType} from './esbuild.ts';
+import type * as EsbuildType from 'https://raw.githubusercontent.com/evanw/esbuild/v0.20.0/lib/shared/types.ts';
+
+export type {EsbuildType};
 
 export type Deferred<T> = ReturnType<typeof Promise.withResolvers<T>>;
 
