@@ -3,7 +3,7 @@ import {encodeHash} from '../utils.ts';
 
 const parseMap = new Map<string, acorn.Program>();
 
-export const parse = (code: string) => {
+export const parseScript = (code: string) => {
   const hash = encodeHash(code);
   if (parseMap.has(hash)) return parseMap.get(hash)!;
   const ast = acorn.parse(code, {sourceType: 'module', ecmaVersion: 'latest'});
@@ -14,3 +14,4 @@ export const parse = (code: string) => {
 export {default as parseImports} from './parse-imports.ts';
 export {default as parseExports} from './parse-exports.ts';
 export {default as stripExports} from './strip-exports.ts';
+export * from './find-export.ts';

@@ -1,5 +1,5 @@
 import {acorn} from '../deps.ts';
-import {parse} from './mod.ts';
+import {parseScript} from './mod.ts';
 import parseExports from './parse-exports.ts';
 import type {ParseExportMap} from '../types.ts';
 
@@ -10,7 +10,7 @@ export const stripExports = (
 ): string => {
   const parsed = parseExports(code);
   code = parsed.code;
-  const ast = parse(code);
+  const ast = parseScript(code);
   // Negative offset to track removed code
   let offset = 0;
   // Invert export map to lookup local names

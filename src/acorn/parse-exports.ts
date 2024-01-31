@@ -1,9 +1,9 @@
 import {acorn} from '../deps.ts';
-import {parse} from './mod.ts';
+import {parseScript} from './mod.ts';
 import type {ParseExportMap} from '../types.ts';
 
 const parseExports = (code: string): {code: string; map: ParseExportMap} => {
-  const ast = parse(code);
+  const ast = parseScript(code);
   const map: ParseExportMap = new Map();
   // Negative offset to track removed code
   let offset = 0;
